@@ -665,6 +665,7 @@ body.has-sandbox-banner header { margin-top:44px }
 <aside id="settings-panel" aria-labelledby="sp-title">
   <div id="sp-head">
     <h2 id="sp-title">Settings</h2>
+    <button class="sp-link" id="sp-expand-all" type="button">Expand all</button>
     <button id="sp-reset-display" type="button" title="Reset display (font, density, spacing, width)" aria-label="Reset display settings"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/><path d="M3 3v5h5"/></svg></button>
     <button id="sp-close" aria-label="Close settings">×</button>
   </div>
@@ -847,6 +848,8 @@ body.has-sandbox-banner header { margin-top:44px }
       <div id="sp-swimlanes"></div>
       <div class="sp-hint">Double-click a swimlane name to rename it. Aa sets the label text: Auto, White or Dark. Reordering, hiding, and color changes are per-user (saved to your sync folder if linked).</div>
       <div class="sp-row" style="margin-top:6px">
+        <button class="sp-btn" id="sp-lanes-collapse">Collapse all</button>
+        <button class="sp-btn" id="sp-lanes-expand">Expand all</button>
         <button class="sp-btn" id="sp-reset-colors">Reset colors</button>
       </div>
     </div>
@@ -3536,9 +3539,19 @@ document.getElementById('sp-fit-width').addEventListener('click', () => {
       const o = {};
       document.querySelectorAll('#settings-panel details.sp-group').forEach(x => { o[x.dataset.g] = x.open; });
       try { localStorage.setItem(KEY, JSON.stringify(o)); } catch (e) {}
+      syncExpandAll();
     });
   });
+  // v4.13: one header link opens every section, or closes them all once they are all open
+  const btn = document.getElementById('sp-expand-all');
+  const groups = () => [...document.querySelectorAll('#settings-panel details.sp-group')];
+  function syncExpandAll() { btn.textContent = groups().every(d => d.open) ? 'Collapse all' : 'Expand all'; }
+  btn.addEventListener('click', () => { const open = btn.textContent === 'Expand all'; groups().forEach(d => { d.open = open; }); });
+  syncExpandAll();
 })();
+// v4.13: swimlane collapse and expand, also in the command palette
+document.getElementById('sp-lanes-collapse').addEventListener('click', () => setAllLanesCollapsed(true));
+document.getElementById('sp-lanes-expand').addEventListener('click', () => setAllLanesCollapsed(false));
 document.getElementById('sp-reset-display').addEventListener('click', () => {
   SETTINGS.density = 'compact'; SETTINGS.rowScale = 1; SETTINGS.laneGap = null;
   SETTINGS.timelineWidth = 1600; SETTINGS.fontFamily = 'system';

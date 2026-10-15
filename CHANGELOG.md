@@ -8,6 +8,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- Settings panel: Expand all (or Collapse all once every section is open) in the header, and Collapse all and Expand all swimlane buttons in the Swimlanes section, next to Reset colors
 - Elapsed time: an optional red bar along the bottom of the timescale from the start of the chart to today (Settings > Timeline > Timeline chrome)
 
 ### Changed
