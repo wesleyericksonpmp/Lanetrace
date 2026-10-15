@@ -1914,7 +1914,7 @@ const SETTINGS_DEFAULTS = {
   todayMode: 'auto',        // v4.6: 'auto' follows the system date, 'custom' pins todayCustom
   todayCustom: '',          // v4.6: yyyy-mm-dd
   showToday: true,
-  showDeps: false,          // v4.13: dependency arrows, off by default
+  showDeps: false,          // v4.12: dependency arrows, off by default
   showLegend: true,
   showGrid: true,
   showQuarterEmphasis: true,
@@ -2219,7 +2219,7 @@ function prepareRows() {
   return rows;
 }
 
-// v4.13: dependencies. Depends on lists predecessor Row IDs; each predecessor should finish before the item starts.
+// v4.12: dependencies. Depends on lists predecessor Row IDs; each predecessor should finish before the item starts.
 function parseDeps(v) {
   if (v == null || v === '') return [];
   return [...new Set(String(v).split(/[,;\s]+/).map(s => s.trim()).filter(Boolean))];
@@ -2275,7 +2275,7 @@ function dependencyChecks(rows) {
   return { issues, conflicts };
 }
 
-// v4.13: finish-to-start arrows from each predecessor's end to its successor's start. Items in a collapsed
+// v4.12: finish-to-start arrows from each predecessor's end to its successor's start. Items in a collapsed
 // swimlane connect through the lane's summary bar. Conflicts draw red and dashed.
 function renderDependencyArrows(rows) {
   const byId = rowIdIndex(rows);
@@ -2293,13 +2293,20 @@ function renderDependencyArrows(rows) {
     DEP_EDGES.push({ from, to });
     const a = ANCHORS[from], b = ANCHORS[to];
     const px = a.r, py = a.y, sx = b.l, sy = b.y;
-    const h = b.h, dx = px + G;
-    let d, head;
-    const mx = (a.l + a.r) / 2;
-    if (a.m && Math.abs(sy - py) > LAYOUT.barH && sx - mx >= G) {   // a milestone's label sits to its right: leave from its top or bottom
+    const h = b.h, mx = (a.l + a.r) / 2;
+    let d, head, dx = px + G;
+    // a milestone's label usually sits to its right: leave from its top or bottom, unless the label is there
+    const lp = (LABEL_CTX[p._rowKey] || {}).pos;
+    const labelInWay = sy > py ? lp === 'Below' : (lp === 'Above' || lp === 'Inside');
+    if (a.m && labelInWay) {   // a centered label: turn down past its right end instead of through it
+      const fs = LAYOUT.fontItem;
+      const lw = textW(p.Title || '', fs, 600) + textW(' · ✓ ' + fmtMD(p._at || parseDate(p.EndDate)), fs, 400);
+      dx = Math.max(dx, mx + lw / 2 + 4);
+    }
+    if (a.m && !labelInWay && Math.abs(sy - py) > LAYOUT.barH && sx - mx >= G) {
       d = `M${mx} ${sy > py ? py + a.h : py - a.h}V${sy}H${sx - 4}`;
       head = `M${sx} ${sy}L${sx - 5} ${sy - 3.5}L${sx - 5} ${sy + 3.5}Z`;
-    } else if (sx - px >= 2 * G) {     // room to enter from the left
+    } else if (sx - dx >= G) {          // room to enter from the left
       d = `M${px} ${py}H${dx}V${sy}H${sx - 4}`;
       head = `M${sx} ${sy}L${sx - 5} ${sy - 3.5}L${sx - 5} ${sy + 3.5}Z`;
     } else if (Math.abs(sy - py) > LAYOUT.barH && dx > b.l && dx < b.r) {   // overlaps in time: drop onto its edge
@@ -2953,7 +2960,7 @@ function resolveBarStyle(itemType, override) {
 // LABEL_CTX records, per row, what the title is drawn on so the grid and editor can flag
 // low-contrast conflicts: 'solid' = on the bar fill, 'tint' = on the light bar tint, 'card' = on the page.
 let LABEL_CTX = {};
-// v4.13: where each drawn item sits, for dependency arrows: { key: { l, r, y } }
+// v4.12: where each drawn item sits, for dependency arrows: { key: { l, r, y } }
 let ANCHORS = {};
 let DEP_EDGES = [];
 const TITLE_CONTRAST_MIN = 3;   // below 3:1 the title is flagged as a conflict
@@ -3055,7 +3062,7 @@ function labelPaint(r, dflt) {
   return c ? ` fill="${c}"` : dflt;
 }
 
-// v4.13: a completed milestone, event or decision shows a check before its date instead of a green dot on the marker
+// v4.12: a completed milestone, event or decision shows a check before its date instead of a green dot on the marker
 function doneDate(s) {
   return s.startsWith('✓ ') ? `<tspan font-weight="700" class="tl-primary">✓</tspan> ${escapeHtml(s.slice(2))}` : escapeHtml(s);
 }
@@ -3505,7 +3512,7 @@ CHROME_TOGGLES.forEach(([id, key]) => {
   });
 });
 
-// v4.13: dependency arrows stay out of "Toggle all" so they only appear when asked for
+// v4.12: dependency arrows stay out of "Toggle all" so they only appear when asked for
 function setShowDeps(on) {
   SETTINGS.showDeps = on; saveSettings(); render(); syncSettingsUi();
   toast(on ? 'Dependency arrows on' : 'Dependency arrows off');
@@ -4087,7 +4094,7 @@ function buildStatusPrompt(o) {
     if (!it.isBar && it.pct > 0 && it.pct < 100) checks.push(`${t} is a ${it.type.toLowerCase()} marked ${it.pct}% complete; single-date items are usually 0 or 100.`);
     if (o.owners && it.status !== 'Complete' && !String(it.r.TaskOwner || '').trim()) checks.push(`${t} has no owner.`);
   });
-  // v4.13: dependencies. Schedule conflicts go to DATA TO CONFIRM; late predecessors put open successors at risk.
+  // v4.12: dependencies. Schedule conflicts go to DATA TO CONFIRM; late predecessors put open successors at risk.
   const byId = rowIdIndex(), byKey = new Map(items.map(i => [i.r._rowKey, i]));
   const titleOf = r => r.Title || '(untitled)';
   dependencyChecks(prepareRows()).conflicts.forEach(c =>

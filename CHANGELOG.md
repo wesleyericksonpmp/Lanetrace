@@ -5,7 +5,9 @@ All notable changes to Lanetrace will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [Unreleased]
+## [4.12.0] - 2026-10-15
+
+First public release.
 
 ### Added
 - Dependencies: a Depends on column takes the Row IDs of items that must finish before an item starts. It is in the Excel template, import, export, the Data view and the item form, where a picker adds items by title and each predecessor shows its finish date
@@ -13,18 +15,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Status update prompt: dependency conflicts go to DATA TO CONFIRM, a new DEPENDENCY RISKS block lists open items waiting on overdue or behind-pace work, and each item lists what it depends on
 - Sample data and the template's sample rows include dependencies
 - Dependency arrows, off by default. Turn them on with "Dependency arrows" in Settings > Timeline or from the command palette. Arrows run from the end of each predecessor to the start of its successor, go under the items, and leave milestones from the top or bottom so they miss the label. Hovering over or tabbing to an item highlights its whole chain and fades the rest. A conflict draws red and dashed. Items in a collapsed swimlane connect through its summary bar. Exports include the arrows when they are on
-
-### Changed
-- Flatter interface: 3px corners on every card, button, input, menu and dialog (they were 4 to 14px), and hairline borders instead of soft shadows. Focus rings are unchanged
-- Dark mode uses dark scrollbars and dark date pickers
-- A completed milestone, event or decision shows a check before its date ("Sign-off · ✓ Sep 30") instead of a small green dot on the marker, which read as a stray mark and relied on color alone
-- The Notes toolbar has four buttons: bold, italic, bullet list and link, the formatting the tooltip and template describe. Headings, numbered lists and code still render when typed
-
-## [4.12.0] - 2026-10-07
-
-First public release.
-
-### Added
 - Swimlane labels wrap by default (Wrap, Shrink or Truncate), with adjustable label and sub-swimlane widths
 - Swimlanes without sub-swimlanes show a wide horizontal label; with sub-swimlanes the name runs vertically in the tab
 - Timescale shapes: Classic, Rounded, and a single-row Pill
@@ -54,6 +44,10 @@ First public release.
 - Documentation for data format, design, and SharePoint compatibility
 
 ### Changed
+- Flatter interface: 3px corners on every card, button, input, menu and dialog (they were 4 to 14px), and hairline borders instead of soft shadows. Focus rings are unchanged
+- Dark mode uses dark scrollbars and dark date pickers
+- A completed milestone, event or decision shows a check before its date ("Sign-off · ✓ Sep 30") instead of a small green dot on the marker, which read as a stray mark and relied on color alone
+- The Notes toolbar has four buttons: bold, italic, bullet list and link, the formatting the tooltip and template describe. Headings, numbered lists and code still render when typed
 - Bar label color follows contrast with the item's color instead of % complete. Every label in every theme pack, light and dark, now reaches 4.5:1
 - Each theme pack has fixed bar label colors: white plus the pack's darkest color. Dark mode previously used one light color for both
 - Fifteen lane colors in the Nord, Dracula, Solarized, Warm, Catppuccin, Gruvbox and Slate packs shifted 3-12% lighter or darker to reach 4.5:1. Corporate is unchanged
