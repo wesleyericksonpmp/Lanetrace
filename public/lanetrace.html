@@ -2874,7 +2874,8 @@ function itemExtent(r, dateToX) {
     const tip = style === 'chevron' ? Math.min(LAYOUT.barH * 0.55, 8) : 0;
     const x = dateToX(r._start), w = Math.max(6, dateToX(r._end) + LAYOUT.pxPerDay - x - tip);   // same geometry as renderItem
     let L = x, R = x + w + tip;
-    if (pos === 'Left') L = x - pad - lw;
+    if (pos === 'Left' && x - pad - lw >= LAYOUT.padX + LAYOUT.labelCol) L = x - pad - lw;
+    else if (pos === 'Left') R = R + pad + 2 + lw;
     else if (pos === 'Above' || pos === 'Below') { L = Math.min(L, x + w / 2 - lw / 2); R = Math.max(R, x + w / 2 + lw / 2); }
     else if (pos === 'Right' || (pos === 'Auto' && lw >= w - 10)) {
       if (R + pad + 2 + lw > limitR) L = Math.min(L, x - pad - lw); else R = R + pad + 2 + lw;
@@ -2885,13 +2886,18 @@ function itemExtent(r, dateToX) {
   const full = lw + textW(' \u00b7 ' + (r._pct >= 100 ? '\u2713 ' : '') + fmtMD(r._at), fs, 400);
   let L, R;
   if (pos === 'Above' || pos === 'Below' || pos === 'Inside') { L = x - full / 2; R = x + full / 2; }
-  else if (pos === 'Left') { L = x - rr - 6 - full; R = x + rr; }
+  else if (pos === 'Left' && x - rr - 6 - full >= LAYOUT.padX + LAYOUT.labelCol) { L = x - rr - 6 - full; R = x + rr; }
   else if (x + rr + 6 + full > limitR) { L = x - rr - 6 - full; R = x + rr; }   // flips left near the edge
   else { L = x - rr; R = x + rr + 6 + full; }
   return { L, R, solo: pos === 'Above' || pos === 'Below' || pos === 'Inside' };
 }
 const AUTO_COMPACT_AT = 100;
 let SHOWN_COUNT = 0;      // items drawn in the current render; set by render()
+// v4.13: a label centered on its item slides inward instead of running past either edge of the chart
+function centerIn(cx, w) {
+  const lo = LAYOUT.padX + LAYOUT.labelCol + w / 2 + 2, hi = CUR_SVGW - LAYOUT.padX - w / 2 - 2;
+  return lo > hi ? cx : Math.min(Math.max(cx, lo), hi);
+}
 function packLines(b, dateToX) {
   const compact = SETTINGS.rowPacking === 'compact' || (SETTINGS.rowPacking === 'auto' && SHOWN_COUNT > AUTO_COMPACT_AT);
   if (!compact) return b.rows.map(r => [r]);
@@ -3122,12 +3128,12 @@ function renderItem(r, cy, dateToX, sw) {
     const rightX = x + w + tipPx + pad + 2;
     LABEL_CTX[r._rowKey] = { shape: 'bar', pos, pct: r._pct, bgs: ['card'], fill: itemFill };
     if (pos === 'Above') {
-      g.push(`<text x="${x + w/2}" y="${barY - pad}" text-anchor="middle" font-size="${LAYOUT.fontItem}" font-weight="600"${labelPaint(r, ' class="tl-primary"')}>${escapeHtml(label)}</text>`);
+      g.push(`<text x="${centerIn(x + w/2, textW(label, LAYOUT.fontItem, 600))}" y="${barY - pad}" text-anchor="middle" font-size="${LAYOUT.fontItem}" font-weight="600"${labelPaint(r, ' class="tl-primary"')}>${escapeHtml(label)}</text>`);
     } else if (pos === 'Below') {
-      g.push(`<text x="${x + w/2}" y="${barY + barH + LAYOUT.fontItem + 1}" text-anchor="middle" font-size="${LAYOUT.fontItem}" font-weight="600"${labelPaint(r, ' class="tl-primary"')}>${escapeHtml(label)}</text>`);
-    } else if (pos === 'Left') {
+      g.push(`<text x="${centerIn(x + w/2, textW(label, LAYOUT.fontItem, 600))}" y="${barY + barH + LAYOUT.fontItem + 1}" text-anchor="middle" font-size="${LAYOUT.fontItem}" font-weight="600"${labelPaint(r, ' class="tl-primary"')}>${escapeHtml(label)}</text>`);
+    } else if (pos === 'Left' && x - pad - textW(label, LAYOUT.fontItem, 600) >= LAYOUT.padX + LAYOUT.labelCol) {   // no room on the left: falls through to the right
       g.push(`<text x="${x - pad}" y="${cy + 3}" text-anchor="end" font-size="${LAYOUT.fontItem}" font-weight="600"${labelPaint(r, ' class="tl-primary"')}>${escapeHtml(label)}</text>`);
-    } else if (pos === 'Right') {
+    } else if (pos === 'Right' || pos === 'Left') {
       { const fl = fitSide(label, rightX, x - pad, LAYOUT.fontItem, 600);
         g.push(`<text x="${fl.x}" y="${cy + 3}"${fl.anchor} font-size="${LAYOUT.fontItem}" font-weight="600"${labelPaint(r, ' class="tl-primary"')}>${escapeHtml(fl.text)}</text>`); }
     } else if (pos === 'Inside') {
@@ -3162,12 +3168,13 @@ function renderItem(r, cy, dateToX, sw) {
   const title = r.Title || '';
   const dateStr = r._at ? (r._pct >= 100 ? '✓ ' : '') + fmtMD(r._at) : '';
   let lx, ly, anchor, shownTitle = title;
+  const centeredW = textW(title, LAYOUT.fontItem, 600) + textW(' · ' + dateStr, LAYOUT.fontItem, 400);
   if (pos === 'Above' || pos === 'Inside') {
     // Icons have no interior — treat Inside as Above
-    lx = x; ly = iconY - rr - 5; anchor = ' text-anchor="middle"';
+    lx = centerIn(x, centeredW); ly = iconY - rr - 5; anchor = ' text-anchor="middle"';
   } else if (pos === 'Below') {
-    lx = x; ly = iconY + rr + LAYOUT.fontItem + 2; anchor = ' text-anchor="middle"';
-  } else if (pos === 'Left') {
+    lx = centerIn(x, centeredW); ly = iconY + rr + LAYOUT.fontItem + 2; anchor = ' text-anchor="middle"';
+  } else if (pos === 'Left' && x - rr - 6 - centeredW >= LAYOUT.padX + LAYOUT.labelCol) {   // no room on the left: falls through to the right
     lx = x - rr - 6; ly = iconY + 3; anchor = ' text-anchor="end"';
   } else {
     // Auto and Right both render right of the icon, flipping left near the chart edge
