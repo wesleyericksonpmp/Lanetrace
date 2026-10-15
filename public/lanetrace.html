@@ -812,6 +812,7 @@ body.has-sandbox-banner header { margin-top:44px }
       </div>
       <div class="sp-check-grid">
         <label class="sp-check"><input type="checkbox" id="sp-today"> Today marker</label>
+        <label class="sp-check"><input type="checkbox" id="sp-elapsed"> Elapsed time</label>
         <label class="sp-check"><input type="checkbox" id="sp-deps"> Dependency arrows</label>
         <label class="sp-check"><input type="checkbox" id="sp-legend"> Legend</label>
         <label class="sp-check"><input type="checkbox" id="sp-grid"> Month grid</label>
@@ -1923,6 +1924,7 @@ const SETTINGS_DEFAULTS = {
   todayMode: 'auto',        // v4.6: 'auto' follows the system date, 'custom' pins todayCustom
   todayCustom: '',          // v4.6: yyyy-mm-dd
   showToday: true,
+  showElapsed: false,       // v4.13: a bar along the bottom of the timescale from the start to today
   showDeps: false,          // v4.12: dependency arrows, off by default
   showLegend: true,
   showGrid: true,
@@ -2069,7 +2071,8 @@ function layoutFor() {
   const subW = clampN(Number(SETTINGS.subLaneW) || 155, 80, 320);
   return {
     laneTabW: tabW, subLaneW: subW, labelCol: tabW + subW + 5, swimlaneFillW: subW + 5,
-    rowH, swPad: gap, headerH: SETTINGS.timescaleStyle === 'pill' ? 38 : d.headerH,
+    // v4.13: the header is the timescale plus a gap; the Today badge hangs in that gap, so it gets room when shown
+    rowH, swPad: gap, headerH: timescaleH() + (SETTINGS.showToday ? 22 : Math.max(6, d.headerH - 54)),
     barH: clampN(Math.round(d.barH * s), 6, Math.max(6, rowH - 4)),
     iconR: Math.max(3, Math.round(d.iconR * (1 + (s - 1) * .6))),
     fontItem: Math.max(7, Math.round(d.fontItem * fs)),
@@ -2552,10 +2555,11 @@ function render() {
   CUR_SVGW = svgW;
   // rows and strip first so their anchors exist; arrows go underneath them
   const rowsSvg = renderRows(bands, dateToX, y0), stripSvg = renderMilestoneStrip(strip, y0);
+  const today = SETTINGS.showToday ? renderTodayMarker(dateToX, y0, svgH - LAYOUT.padY, x0, x0 + tlW) : { under: '', over: '' };
+  parts.push(today.under);    // under the arrows and items, so it never strikes through a label
   parts.push(SETTINGS.showDeps ? renderDependencyArrows(rows) : '');
   if (!SETTINGS.showDeps) DEP_EDGES = [];
-  parts.push(rowsSvg, stripSvg);
-  if (SETTINGS.showToday) parts.push(renderTodayMarker(dateToX, y0, svgH - LAYOUT.padY, x0, x0 + tlW));
+  parts.push(rowsSvg, stripSvg, today.over);
 
   svg.innerHTML = parts.join('');
 
@@ -3201,19 +3205,28 @@ function dateLabel(r) {
   return '';
 }
 
+// v4.13: height of the drawn timescale, so the Today badge and the first row line up with its real bottom edge
+function timescaleH() { return SETTINGS.timescaleStyle === 'pill' ? 30 : 54; }
+
+// v4.13: the Today badge hangs from the bottom edge of the timescale with a notch at the exact date. The line is
+// thin and solid and draws under the items; the badge draws on top. Returns { under, over } so render() can layer them.
 function renderTodayMarker(dateToX, yTop, yBottom, xMin, xMax) {
   const t = getToday();
-  const x = dateToX(t);
-  if (x < xMin || x > xMax) return '';          // outside the visible range: no marker
+  const x = dateToX(t) + LAYOUT.pxPerDay / 2;     // middle of today
+  if (x < xMin || x > xMax) return { under: '', over: '' };
   const custom = SETTINGS.todayMode === 'custom';
   const label = custom ? fmtMD(t) : 'Today';
-  const w = custom ? 52 : 44;
+  const w = custom ? 52 : 44, edge = yTop + timescaleH(), by = edge + 4;
   const bx = Math.min(Math.max(x, xMin + w / 2), xMax - w / 2);   // keep the badge inside the chart
-  return `
-    <line x1="${x}" y1="${yTop + LAYOUT.headerH - 4}" x2="${x}" y2="${yBottom}" stroke="var(--red)" stroke-width="1.5" stroke-dasharray="4 4" opacity=".8" />
-    <rect x="${bx - w/2}" y="${yTop + LAYOUT.headerH - 18}" width="${w}" height="14" rx="3" fill="var(--red)" />
-    <text x="${bx}" y="${yTop + LAYOUT.headerH - 8}" fill="#fff" font-size="9" font-weight="700" text-anchor="middle">${label}</text>
-  `;
+  const elapsed = SETTINGS.showElapsed
+    ? `<rect x="${xMin}" y="${edge - 3}" width="${Math.max(0, x - xMin)}" height="3" fill="var(--red)" />` : '';
+  return {
+    under: `<line x1="${x}" y1="${by + 14}" x2="${x}" y2="${yBottom}" stroke="var(--red)" stroke-width="1" opacity=".7" />`,
+    over: elapsed +
+      `<path d="M${x - 4} ${by}L${x} ${edge}L${x + 4} ${by}Z" fill="var(--red)" />` +
+      `<rect x="${bx - w / 2}" y="${by}" width="${w}" height="14" rx="2" fill="var(--red)" />` +
+      `<text x="${bx}" y="${by + 10}" fill="#fff" font-size="9" font-weight="700" text-anchor="middle">${label}</text>`
+  };
 }
 
 function renderLegend() {
@@ -3359,6 +3372,7 @@ function syncSettingsUi() {
   // checkboxes
   document.getElementById('sp-today').checked   = !!SETTINGS.showToday;
   document.getElementById('sp-deps').checked    = !!SETTINGS.showDeps;
+  document.getElementById('sp-elapsed').checked = !!SETTINGS.showElapsed;
   document.getElementById('sp-legend').checked  = !!SETTINGS.showLegend;
   document.getElementById('sp-grid').checked    = !!SETTINGS.showGrid;
   document.getElementById('sp-qmajor').checked  = !!SETTINGS.showQuarterEmphasis;
@@ -3546,11 +3560,11 @@ document.getElementById('sp-today-date').addEventListener('change', ev => {
 });
 
 // checkboxes
-const CHROME_TOGGLES = [['sp-today','showToday'], ['sp-legend','showLegend'], ['sp-grid','showGrid'],
+const CHROME_TOGGLES = [['sp-today','showToday'], ['sp-elapsed','showElapsed'], ['sp-legend','showLegend'], ['sp-grid','showGrid'],
  ['sp-qmajor','showQuarterEmphasis'], ['sp-bands','showBands'], ['sp-swimlane-fill','showSwimlaneFill']];
 CHROME_TOGGLES.forEach(([id, key]) => {
   document.getElementById(id).addEventListener('change', ev => {
-    SETTINGS[key] = ev.target.checked; saveSettings(); render();
+    SETTINGS[key] = ev.target.checked; saveSettings(); applySettings(); render();   // the Today badge changes the header height
   });
 });
 
@@ -3566,7 +3580,7 @@ document.getElementById('sp-chrome-toggle-all').addEventListener('click', () => 
   const allOn = CHROME_TOGGLES.every(([_, key]) => !!SETTINGS[key]);
   const next  = !allOn;                            // all on → off; anything else → on
   CHROME_TOGGLES.forEach(([_, key]) => { SETTINGS[key] = next; });
-  saveSettings(); render(); syncSettingsUi();
+  saveSettings(); applySettings(); render(); syncSettingsUi();
 });
 
 // reset colors
