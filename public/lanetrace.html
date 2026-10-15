@@ -125,6 +125,8 @@ svg { display:block; user-select:none }
 .data-grid .cell.focused { box-shadow:inset 0 0 0 2px var(--blue) }
 .data-grid .cell.cell-notes { white-space:nowrap; overflow:hidden; text-overflow:ellipsis; max-width:320px }
 .data-grid .cell.editing { background:var(--bg); box-shadow:inset 0 0 0 2px var(--blue) }
+/* v4.13: the edit box replaces the cell text while editing, so the row keeps its height */
+.data-grid td[data-editing="1"]:has(> .cell-editor) > .cell { display:none }
 .data-grid td[data-field="RowID"] .cell,
 .data-grid td[data-field="PercentComplete"] .cell,
 .data-grid td[data-field="StartDate"] .cell,
@@ -175,7 +177,9 @@ svg { display:block; user-select:none }
 .data-grid .cell-barstyle { display:inline-flex; align-items:center; gap:8px; padding:6px 10px; white-space:nowrap }
 .data-grid .cell-barstyle .barstyle-label.muted { color:var(--muted); font-style:italic }
 .data-grid tbody tr:hover td.col-actions { background:var(--band) }
-.data-grid tbody tr.row-selected { background:var(--accent-bg, #e6f0ff) !important }
+.data-grid tbody tr.row-selected { background:color-mix(in srgb, var(--blue) 12%, var(--card)) !important }
+/* v4.13: the selected row mixes the theme's accent into the card color, so dark mode gets a dark tint, not light blue */
+[data-theme="dark"] .data-grid tbody tr.row-selected { background:color-mix(in srgb, var(--blue) 30%, var(--card)) !important }
 .data-grid tbody tr.row-selected td { background:inherit }
 .row-action-group { display:flex; gap:4px; margin-left:8px; padding-left:8px; border-left:1px solid var(--border) }
 .row-action-group button:disabled { opacity:0.4; cursor:not-allowed }
@@ -420,6 +424,16 @@ body.has-sandbox-banner header { margin-top:44px }
 #tl.dep-focus .dep-arrow { opacity:.12 }
 #tl.dep-focus .dep-arrow.on { opacity:1 }
 #tl.dep-focus .dep-arrow.on path:first-child { stroke-width:2 }
+/* v4.13: bar style and marker shape pickers in the item form, drawn like the Data view previews */
+.pick-row { display:flex; flex-wrap:wrap; gap:6px }
+.pick-row button { display:inline-flex; align-items:center; gap:6px; height:30px; padding:0 10px; border:1px solid var(--border);
+  border-radius:3px; background:var(--bg); color:var(--text); font:inherit; font-size:12px; cursor:pointer }
+.pick-row button svg { color:var(--muted); flex-shrink:0 }
+.pick-row button:hover { border-color:var(--blue) }
+.pick-row button.on { border-color:var(--blue); box-shadow:inset 0 0 0 1px var(--blue) }
+.pick-row button.on svg { color:var(--blue) }
+.pick-row.icons button { width:30px; padding:0; justify-content:center }
+.pick-row.icons button.auto { width:auto; padding:0 10px }
 .dep-row { display:flex; gap:8px } .dep-row input { flex:1; min-width:0 } .dep-row select { flex:0 0 42% }
 .dep-names { font-size:12px; color:var(--muted); margin-top:4px; line-height:1.5 }
 .dep-names:empty { display:none } .dep-names .warn { color:var(--red); font-weight:600 }
@@ -1156,30 +1170,16 @@ body.has-sandbox-banner header { margin-top:44px }
           <div class="tc-msg" id="f-titlecolor-msg" hidden></div>
           <div class="field-row" id="row-bar-style">
             <div class="field">
-              <label for="f-barstyle">Bar style</label>
-              <select id="f-barstyle">
-                <option value="">Auto (Task chevron, Phase pill)</option>
-                <option value="flat">Flat</option>
-                <option value="chevron">Chevron</option>
-                <option value="pill">Pill</option>
-              </select>
+              <label id="f-barstyle-lbl">Bar style</label>
+              <input type="hidden" id="f-barstyle">
+              <div class="pick-row" id="f-barstyle-pick" role="radiogroup" aria-labelledby="f-barstyle-lbl"></div>
             </div>
-            <div class="field"></div>
           </div>
           <div class="field-row" id="row-milestone-shape">
             <div class="field">
-              <label for="f-shape">Marker shape</label>
-              <select id="f-shape">
-                <option value="">Auto (from item type)</option>
-                <option value="diamond">Diamond ◆</option>
-                <option value="diamond-tall">Diamond, tall ◆</option>
-                <option value="circle">Circle ●</option>
-                <option value="triangle-right">Triangle, right ▶</option>
-                <option value="triangle-down">Triangle, down ▼</option>
-                <option value="triangle-down-large">Triangle, down (big) ▼</option>
-                <option value="star">Star ★</option>
-                <option value="flag">Flag ⚑</option>
-              </select>
+              <label id="f-shape-lbl">Marker shape</label>
+              <input type="hidden" id="f-shape">
+              <div class="pick-row icons" id="f-shape-pick" role="radiogroup" aria-labelledby="f-shape-lbl"></div>
             </div>
             <div class="field">
               <label for="f-mtier">Row above timeline</label>
@@ -5512,6 +5512,7 @@ function openEditor(key, defaults = {}) {
   { const bs = String(row?.BarStyle || '').trim().toLowerCase();
     document.getElementById('f-barstyle').value = ['flat', 'chevron', 'pill'].includes(bs) ? bs : ''; }
   renderCustomFields(row);
+  syncFormPickers();
 
   populateLaneSelect(row?.Swimlane || SWIMLANES[0]?.name || '');
   updateDateRowsForType();
@@ -5657,7 +5658,7 @@ function updateAppearanceSummary() {
   if (v('f-titlecolor') !== 'Auto') parts.push(`${v('f-titlecolor')} title`);
   if (isBar) parts.push(v('f-barstyle') ? `${v('f-barstyle')} bar` : 'auto bar');
   else {
-    parts.push(v('f-shape') ? document.getElementById('f-shape').selectedOptions[0].textContent.replace(/\s*[^\w\s,()-]+$/, '') : 'auto shape');
+    parts.push(v('f-shape') ? (MILESTONE_SHAPES[v('f-shape')]?.label || v('f-shape')).toLowerCase() : 'auto shape');
     if (v('f-mtier')) parts.push(`strip row ${v('f-mtier')}`);
   }
   let html = escapeHtml(parts.join(' · '));
@@ -5667,6 +5668,39 @@ function updateAppearanceSummary() {
 }
 ['f-labelpos', 'f-titlecolor', 'f-barstyle', 'f-shape', 'f-mtier', 'f-shown'].forEach(id =>
   document.getElementById(id).addEventListener('change', () => updateAppearanceSummary()));
+
+// v4.13: button pickers write to the hidden f-barstyle and f-shape inputs
+function buildFormPickers() {
+  const bar = [['', 'Auto'], ['flat', 'Flat'], ['chevron', 'Chevron'], ['pill', 'Pill']];
+  document.getElementById('f-barstyle-pick').innerHTML = bar.map(([v, l]) =>
+    `<button type="button" role="radio" data-v="${v}" title="${v ? l : 'Auto: tasks get a chevron, phases get a pill'}">` +
+    `${renderBarStylePreview(v || 'chevron', 34, 14)}<span>${l}</span></button>`).join('');
+  document.getElementById('f-shape-pick').innerHTML =
+    `<button type="button" role="radio" data-v="" class="auto" title="Auto: the item type's default shape">Auto</button>` +
+    Object.entries(MILESTONE_SHAPES).map(([k, m]) =>
+      `<button type="button" role="radio" data-v="${k}" title="${m.label}" aria-label="${m.label}">${renderShapePreview(k, 18)}</button>`).join('');
+  [['f-barstyle-pick', 'f-barstyle'], ['f-shape-pick', 'f-shape']].forEach(([pick, input]) =>
+    document.getElementById(pick).addEventListener('click', ev => {
+      const b = ev.target.closest('button[data-v]'); if (!b) return;
+      const el = document.getElementById(input);
+      el.value = b.dataset.v; el.dispatchEvent(new Event('change'));
+      syncFormPickers();
+    }));
+}
+function syncFormPickers() {
+  const type = document.getElementById('f-type').value;
+  // Auto previews the shape the item will actually get
+  const auto = document.querySelector('#f-barstyle-pick button[data-v=""] svg');
+  if (auto) auto.outerHTML = renderBarStylePreview(type === 'Phase' ? 'pill' : 'chevron', 34, 14);
+  [['f-barstyle-pick', 'f-barstyle'], ['f-shape-pick', 'f-shape']].forEach(([pick, input]) => {
+    const v = document.getElementById(input).value;
+    document.querySelectorAll(`#${pick} button`).forEach(b => {
+      const on = b.dataset.v === v; b.classList.toggle('on', on); b.setAttribute('aria-checked', on);
+    });
+  });
+}
+buildFormPickers();
+document.getElementById('f-type').addEventListener('change', syncFormPickers);
 
 // v4.13: one duplicate for the item form and the row menu. The copy gets the next Row ID.
 function duplicateRow(fields) {
