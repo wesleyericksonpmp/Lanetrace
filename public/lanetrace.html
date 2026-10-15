@@ -1086,7 +1086,7 @@ body.has-sandbox-banner header { margin-top:44px }
             <button type="button" data-md="ol" title="Numbered list"><svg viewBox="0 0 24 24"><line x1="10" y1="6" x2="21" y2="6"/><line x1="10" y1="12" x2="21" y2="12"/><line x1="10" y1="18" x2="21" y2="18"/><path d="M4 6h1v4"/><path d="M4 10h2"/><path d="M6 18H4c0-1 2-2 2-3s-1-1.5-2-1"/></svg></button>
             <button type="button" data-md="ul" title="Bullet list"><svg viewBox="0 0 24 24"><line x1="9" y1="6" x2="20" y2="6"/><line x1="9" y1="12" x2="20" y2="12"/><line x1="9" y1="18" x2="20" y2="18"/><circle cx="4" cy="6" r="1.5"/><circle cx="4" cy="12" r="1.5"/><circle cx="4" cy="18" r="1.5"/></svg></button>
             <span class="sep"></span>
-            <button type="button" data-md="link" title="Insert link"><svg viewBox="0 0 24 24"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/></svg></button>
+            <button type="button" data-md="link" title="Link (Ctrl+K): select text, click, then paste the address"><svg viewBox="0 0 24 24"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/></svg></button>
           </div>
           <textarea id="f-notes" placeholder="Detail, definition of done, links"></textarea>
         </div>
@@ -7268,6 +7268,8 @@ document.addEventListener('keydown', ev => {
       textarea.value = text.substring(0, start) + insert + text.substring(end);
       textarea.selectionStart = textarea.selectionEnd = start + cursorOffset;
     }
+    // v4.13: select the url placeholder so pasting the address replaces it
+    if (action === 'link') textarea.setSelectionRange(start + insert.length - 4, start + insert.length - 1);
   }
 
   // Text style applies to the current line: replace any heading marker with the chosen one
@@ -7322,8 +7324,11 @@ function renderMarkdown(text) {
   html = html.replace(/\*(.+?)\*/g, '<em>$1</em>');
   // Inline code
   html = html.replace(/`([^`]+)`/g, '<code>$1</code>');
-  // Links [text](url)
-  html = html.replace(/\[([^\]]+)\]\(([^)]+)\)/g, '<a href="$2" target="_blank" rel="noopener">$1</a>');
+  // Links [text](url). v4.13: only web and mail addresses become links; a leftover placeholder shows as plain text
+  html = html.replace(/\[([^\]]+)\]\(([^)]+)\)/g, (m, t, u) =>
+    /^(https?:\/\/|mailto:)/i.test(u.trim()) ? `<a href="${u.trim()}" target="_blank" rel="noopener">${t}</a>` : t);
+  // v4.13: a bare web address is a link too
+  html = html.replace(/(^|[\s(])(https?:\/\/[^\s<]*[^\s<.,;:!?)])/gm, '$1<a href="$2" target="_blank" rel="noopener">$2</a>');
   // Ordered lists first, marked so the bullet wrap below leaves them alone
   html = html.replace(/^\d+\. (.+)$/gm, '<li class="o">$1</li>');
   html = html.replace(/(<li class="o">.*<\/li>\n?)+/g, '<ol>$&</ol>');
