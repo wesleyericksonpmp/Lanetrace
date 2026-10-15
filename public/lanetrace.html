@@ -791,6 +791,16 @@ body.has-sandbox-banner header { margin-top:44px }
         </select>
       </div>
       <div class="sp-hint" id="sp-tiers-note"></div>
+      <div class="sp-row" style="margin-top:6px">
+        <label class="sp-hint" for="sp-duration" style="min-width:42px">Duration</label>
+        <select id="sp-duration" class="sp-select" title="Adds each task's or phase's length after its title">
+          <option value="off">Off</option>
+          <option value="auto">Auto (days, weeks or months)</option>
+          <option value="days">Days</option>
+          <option value="weeks">Weeks</option>
+          <option value="months">Months</option>
+        </select>
+      </div>
       <div class="sp-lbl" style="margin-top:6px">Milestones</div>
       <div class="sp-row">
         <div class="sp-seg" id="sp-ms">
@@ -1938,6 +1948,7 @@ const SETTINGS_DEFAULTS = {
   subLaneW: 155,               // v4.7: width of the sub-swimlane label column (px)
   todayMode: 'auto',        // v4.6: 'auto' follows the system date, 'custom' pins todayCustom
   todayCustom: '',          // v4.6: yyyy-mm-dd
+  durationLabel: 'off',     // v4.13: 'off' | 'auto' | 'days' | 'weeks' | 'months', added after bar titles
   timescaleTiers: 'auto',   // v4.13: 'auto' or a TIER_PRESETS key
   showToday: true,
   showElapsed: false,       // v4.13: a bar along the bottom of the timescale from the start to today
@@ -2909,7 +2920,7 @@ function itemExtent(r, dateToX) {
   const fs = LAYOUT.fontItem, rr = LAYOUT.iconR, pad = 8;
   const pos = r.LabelPosition || 'Auto';
   const limitR = CUR_SVGW - LAYOUT.padX;
-  const lw = textW(r.Title || '', fs, 600);
+  const lw = textW((r.Title || '') + (r._start && r._end ? durationSuffix(r) : ''), fs, 600);
   if (r._start && r._end) {
     const style = resolveBarStyle(r.ItemType, r.BarStyle);
     const tip = style === 'chevron' ? Math.min(LAYOUT.barH * 0.55, 8) : 0;
@@ -3125,6 +3136,17 @@ function labelPaint(r, dflt) {
 function doneDate(s) {
   return s.startsWith('✓ ') ? `<tspan font-weight="700" class="tl-primary">✓</tspan> ${escapeHtml(s.slice(2))}` : escapeHtml(s);
 }
+// v4.13: optional duration after a bar's title, in calendar days counting both the start and end day
+function durationSuffix(r) {
+  const mode = SETTINGS.durationLabel;
+  if (!mode || mode === 'off' || r._summary || !(r._start && r._end)) return '';
+  const days = dayDiff(r._end, r._start) + 1;
+  const unit = mode !== 'auto' ? mode : days < 14 ? 'days' : days <= 112 ? 'weeks' : 'months';
+  const raw = unit === 'days' ? days : days / (unit === 'weeks' ? 7 : 30.44);
+  const n = raw < 2 && unit !== 'days' ? Math.round(raw * 10) / 10 : Math.round(raw);   // whole units, one decimal below 2
+  const word = unit === 'days' ? (n === 1 ? 'day' : 'days') : unit === 'weeks' ? (n === 1 ? 'wk' : 'wks') : 'mo';
+  return ` · ${n} ${word}`;
+}
 function renderItem(r, cy, dateToX, sw) {
   const type = ITEM_TYPES[r.ItemType] || ITEM_TYPES.Milestone;
   const g = [];
@@ -3162,7 +3184,7 @@ function renderItem(r, cy, dateToX, sw) {
       const progStyle = (style === 'chevron' && r._pct < 100) ? 'flat' : style;
       g.push(`<path d="${barPath(x, barY, pw, barH, progStyle)}" fill="${itemFill}" class="task_shape" />`);
     }
-    const label = r.Title || '';
+    const label = (r.Title || '') + durationSuffix(r);
     const charW = LAYOUT.fontItem * fontStack().cw;
     const fits  = label.length * charW < w - 10;
     const pad   = 6;
@@ -3392,6 +3414,7 @@ function syncSettingsUi() {
     .forEach(([id, key, dflt]) => document.querySelectorAll('#' + id + ' button')
       .forEach(b => b.classList.toggle('on', b.dataset.v === (SETTINGS[key] || dflt))));
   updateMsNote();
+  document.getElementById('sp-duration').value = SETTINGS.durationLabel || 'off';
   document.getElementById('sp-tiers').value = TIER_PRESETS[SETTINGS.timescaleTiers] ? SETTINGS.timescaleTiers : 'auto';
   { const names = { year: 'Year', quarter: 'Quarter', month: 'Month', week: 'Week' };
     document.getElementById('sp-tiers-note').textContent = SETTINGS.timescaleStyle === 'pill'
@@ -3588,6 +3611,9 @@ document.getElementById('sp-fit-width').addEventListener('click', () => {
   btn.addEventListener('click', () => { const open = btn.textContent === 'Expand all'; groups().forEach(d => { d.open = open; }); });
   syncExpandAll();
 })();
+document.getElementById('sp-duration').addEventListener('change', ev => {
+  SETTINGS.durationLabel = ev.target.value; saveSettings(); render();
+});
 document.getElementById('sp-tiers').addEventListener('change', ev => {
   SETTINGS.timescaleTiers = ev.target.value; saveSettings(); applySettings(); render(); syncSettingsUi();
 });
