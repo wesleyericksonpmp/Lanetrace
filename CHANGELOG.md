@@ -12,8 +12,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 - Today marker: the badge hangs from the bottom edge of the timescale with a notch at the exact date, in every density and timescale shape. Before, it drifted with density: over the month names in Ultra, inside the month row in Compact, half on and half off in Normal. The line is thin and solid and draws under the items, so it no longer strikes through labels
-- Notes links: after you click the link button, the url placeholder is selected, so pasting the address replaces it. A web address typed or pasted on its own becomes a link, with or without https:// (www.example.com works). Only web and email addresses become links; a leftover placeholder shows as plain text
-- Notes toolbar: a text style list (Normal, Heading 1, 2, 3) that applies to the current line, then bold, italic, numbered list, bullet list and link. Headings and numbered lists were missing from the 4.12.0 toolbar
+- Notes toolbar: a text style list (Normal, Heading 1, 2, 3) that applies to the current line, then bold, italic, numbered list and bullet list. Headings and numbered lists were missing from the 4.12.0 toolbar. The link button is removed for now, because links in notes could not be clicked anywhere in the app
 
 ### Fixed
 - Settings > Timeline > Milestones has three choices: In swimlanes (every milestone, event and decision stays in its swimlane, even with a Strip Row), As set per item (the default: only items with a Strip Row go above) and Above timeline. Before, "In swimlanes" could not bring down items with a Strip Row, so the toggle looked broken. A note under the choices counts items with a Strip Row and offers Clear Strip Rows. Saved timelines keep their look

@@ -85,8 +85,6 @@ The Notes field supports basic Markdown:
 2. Second item
 
 `inline code`
-
-[Link text](https://example.com)
 ```
 
 ## Character Limits

@@ -1085,8 +1085,6 @@ body.has-sandbox-banner header { margin-top:44px }
             <span class="sep"></span>
             <button type="button" data-md="ol" title="Numbered list"><svg viewBox="0 0 24 24"><line x1="10" y1="6" x2="21" y2="6"/><line x1="10" y1="12" x2="21" y2="12"/><line x1="10" y1="18" x2="21" y2="18"/><path d="M4 6h1v4"/><path d="M4 10h2"/><path d="M6 18H4c0-1 2-2 2-3s-1-1.5-2-1"/></svg></button>
             <button type="button" data-md="ul" title="Bullet list"><svg viewBox="0 0 24 24"><line x1="9" y1="6" x2="20" y2="6"/><line x1="9" y1="12" x2="20" y2="12"/><line x1="9" y1="18" x2="20" y2="18"/><circle cx="4" cy="6" r="1.5"/><circle cx="4" cy="12" r="1.5"/><circle cx="4" cy="18" r="1.5"/></svg></button>
-            <span class="sep"></span>
-            <button type="button" data-md="link" title="Link (Ctrl+K): select text, click, then paste the address"><svg viewBox="0 0 24 24"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/></svg></button>
           </div>
           <textarea id="f-notes" placeholder="Detail, definition of done, links"></textarea>
         </div>
@@ -4560,8 +4558,8 @@ const TEMPLATE_COLUMNS = [
     what: 'Items that must finish before this one starts. Lanetrace flags any item that starts before a predecessor finishes.', ex: '3, 5',
     hint: 'Row IDs of items that must finish before this one starts, separated by commas, like 3, 5. Leave blank if none.' },
   { h: 'Notes', w: 46, kind: 'wrap', req: false, accepts: 'Text with basic Markdown',
-    what: 'Detail for the tooltip and item panel. Supports **bold**, *italic*, - bullets and [links](https://...).', ex: '**Scope:** login, profile',
-    hint: 'Detail for the tooltip and item panel. Supports **bold**, *italic*, - bullets and [text](https://link).' },
+    what: 'Detail for the tooltip and item panel. Supports **bold**, *italic*, # headings, - bullets and 1. numbered lists.', ex: '**Scope:** login, profile',
+    hint: 'Detail for the tooltip and item panel. Supports **bold**, *italic*, # headings, - bullets and 1. numbered lists.' },
   { h: 'Item Type', w: 14, kind: 'text', req: false, accepts: 'Task, Phase, Milestone, Event, Decision',
     what: 'What to draw. Blank lets Lanetrace decide from the dates (see How Lanetrace reads your data).', ex: 'Phase',
     hint: 'Blank lets Lanetrace decide: no start date or a same-day start and end = Milestone, 92 days or less = Task, longer = Phase.',
@@ -7254,10 +7252,6 @@ document.addEventListener('keydown', ev => {
         insert = `1. ${selected || 'List item'}`;
         cursorOffset = insert.length;
         break;
-      case 'link':
-        insert = `[${selected || 'link text'}](url)`;
-        cursorOffset = selected ? insert.length - 5 : 1;
-        break;
     }
 
     textarea.focus();
@@ -7268,8 +7262,6 @@ document.addEventListener('keydown', ev => {
       textarea.value = text.substring(0, start) + insert + text.substring(end);
       textarea.selectionStart = textarea.selectionEnd = start + cursorOffset;
     }
-    // v4.13: select the url placeholder so pasting the address replaces it
-    if (action === 'link') textarea.setSelectionRange(start + insert.length - 4, start + insert.length - 1);
   }
 
   // Text style applies to the current line: replace any heading marker with the chosen one
@@ -7307,7 +7299,6 @@ document.addEventListener('keydown', ev => {
     const mod = ev.ctrlKey || ev.metaKey;
     if (mod && ev.key.toLowerCase() === 'b') { ev.preventDefault(); insertMd('bold'); }
     if (mod && ev.key.toLowerCase() === 'i') { ev.preventDefault(); insertMd('italic'); }
-    if (mod && ev.key.toLowerCase() === 'k') { ev.preventDefault(); insertMd('link'); }
   });
 })();
 
