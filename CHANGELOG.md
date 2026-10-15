@@ -27,6 +27,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Labels set to Left on items at the start of the timeline ran into the swimlane names. They now move to the right of the item when the left has no room
 - Data view in dark mode: the selected row was light blue with white text, which was unreadable. It now mixes the theme's accent into the dark background, with at least 4.5:1 text contrast in every theme pack
 - Data view: editing a cell showed the old text and the edit box stacked, doubling the row height. The edit box now replaces the text
+- Data view: the row menu (⋮ or right-click) opened below the bottom of the window for rows near the bottom, hiding Delete and the other options. It now opens upward when there is no room below and always stays inside the window
 - Duplicate gave the copy no Row ID, which broke Depends on references and Excel round trips. Copies now get the next Row ID
 - Numbered lists in notes showed as unnumbered items in tooltips and the item card
 

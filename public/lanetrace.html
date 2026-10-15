@@ -7135,7 +7135,7 @@ function initGrid() {
       ev.preventDefault();
       CONTEXT_MENU.rowKey = moreBtn.dataset.key;
       const rect = moreBtn.getBoundingClientRect();
-      showContextMenu(rect.left, rect.bottom + 4);
+      showContextMenu(rect.left, rect.bottom + 4, rect.top - 4);
     }
   });
 }
@@ -7143,13 +7143,16 @@ function initGrid() {
 // v4.3: Context menu state and handlers
 let CONTEXT_MENU = { rowKey: null };
 
-function showContextMenu(x, y) {
+// v4.13: flipUpAt is where the menu's bottom goes when it would run off the bottom of the window
+function showContextMenu(x, y, flipUpAt = y) {
   const menu = document.getElementById('row-context-menu');
   const r = CONTEXT_MENU.rowKey && findRow(CONTEXT_MENU.rowKey);
   document.getElementById('ctx-toggle-shown').textContent = r && !isRowShown(r) ? 'Show on timeline' : 'Hide from timeline';
-  menu.style.left = x + 'px';
-  menu.style.top = y + 'px';
   menu.classList.add('on');
+  const { width: w, height: h } = menu.getBoundingClientRect(), m = 8;
+  const top = y + h > window.innerHeight - m ? flipUpAt - h : y;
+  menu.style.left = Math.max(m, Math.min(x, window.innerWidth - w - m)) + 'px';
+  menu.style.top = Math.max(m, Math.min(top, window.innerHeight - h - m)) + 'px';
   // Close on outside click
   setTimeout(() => document.addEventListener('click', hideContextMenu, { once: true }), 0);
 }
