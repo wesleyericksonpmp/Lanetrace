@@ -11,6 +11,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Notes toolbar: a text style list (Normal, Heading 1, 2, 3) that applies to the current line, then bold, italic, numbered list, bullet list and link. Headings and numbered lists were missing from the 4.12.0 toolbar
 
 ### Fixed
+- Settings > Timeline > Milestones has three choices: In swimlanes (every milestone, event and decision stays in its swimlane, even with a Strip Row), As set per item (the default: only items with a Strip Row go above) and Above timeline. Before, "In swimlanes" could not bring down items with a Strip Row, so the toggle looked broken. A note under the choices counts items with a Strip Row and offers Clear Strip Rows. Saved timelines keep their look
 - Numbered lists in notes showed as unnumbered items in tooltips and the item card
 
 ## [4.12.0] - 2026-10-15

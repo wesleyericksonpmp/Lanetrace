@@ -33,7 +33,7 @@ This document describes the Excel column schema for Lanetrace timeline data.
 | Label Position | LabelPosition | Text | Auto | Auto/Above/Below/Left/Right/Inside (any case) |
 | Milestone Shape | MilestoneShape | Text | (type default) | diamond, diamond-tall, circle, triangle-right, triangle-down, triangle-down-large, star, flag (any case) |
 | Bar Style | BarStyle | Text | Auto | Flat/Chevron/Pill. Auto gives tasks a chevron and phases rounded ends |
-| Milestone Row | MilestoneTier | Integer 1-6 | (blank) | Moves a milestone, event or decision into that row of the strip above the timescale. Blank keeps it in its swimlane unless Settings places all milestones above |
+| Milestone Row | MilestoneTier | Integer 1-6 | (blank) | Moves a milestone, event or decision into that row of the strip above the timescale. Settings > Timeline > Milestones decides how it applies: In swimlanes ignores it, As set per item (the default) uses it, Above timeline moves every milestone up and uses it to pick the row |
 | Shown | IsShown | Boolean | TRUE | FALSE, No, N, 0, Off or Hidden (any case) hides the item. Anything else, or blank, shows it. |
 | Color Category | ColorCategory | Text | (blank) | Hex color override (e.g., #78BE20) |
 | Title Color | TitleColor | Text | Auto | Auto/White/Dark or a hex color for the item label |

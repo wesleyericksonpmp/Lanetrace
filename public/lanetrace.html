@@ -780,9 +780,11 @@ body.has-sandbox-banner header { margin-top:44px }
       <div class="sp-row">
         <div class="sp-seg" id="sp-ms">
           <button data-v="rows">In swimlanes</button>
+          <button data-v="mixed">As set per item</button>
           <button data-v="above">Above timeline</button>
         </div>
       </div>
+      <div class="sp-hint" id="sp-ms-note" hidden></div>
       <div class="sp-lbl" style="margin-top:6px">Swimlane labels</div>
       <div class="sp-row">
         <div class="sp-seg" id="sp-lanelabel">
@@ -1147,7 +1149,7 @@ body.has-sandbox-banner header { margin-top:44px }
             </div>
             <div class="field">
               <label for="f-mtier">Row above timeline</label>
-              <select id="f-mtier" title="Pick a row to show this item in the strip above the timescale">
+              <select id="f-mtier" title="Pick a row in the strip above the timescale. Used when Settings > Milestones is As set per item (the default) or Above timeline">
                 <option value="">Auto (follows Settings)</option>
                 <option value="1">Row 1 (closest to timeline)</option>
                 <option value="2">Row 2</option>
@@ -1913,7 +1915,8 @@ const SETTINGS_DEFAULTS = {
                                // v4.12: 'auto' = compact once more than AUTO_COMPACT_AT items are shown
   pageLayout: 'centered',      // v4.9: 'centered' (max 1600px page chrome) | 'full'
   timescaleStyle: 'classic',   // v4.7: 'classic' | 'rounded' | 'pill'
-  milestonePlacement: 'rows',  // v4.7: 'rows' (in swimlanes) | 'above' (strip above the timescale)
+  milestonePlacement: 'mixed', // 'rows' = all in swimlanes | 'mixed' = items with a Strip Row go above | 'above' = all above
+  msPlacementV2: true,         // v4.13: 'rows' used to let Strip Row items through; saved 'rows' becomes 'mixed' once
   laneLabelMode: 'wrap',       // v4.7: 'wrap' | 'shrink' | 'truncate'
   laneTabW: 40,                // v4.7: width of the colored swimlane tab (px)
   subLaneW: 155,               // v4.7: width of the sub-swimlane label column (px)
@@ -2042,6 +2045,8 @@ function loadSettings() {
     const raw = localStorage.getItem('ptl-settings');
     if (!raw) return structuredClone(SETTINGS_DEFAULTS);
     const parsed = JSON.parse(raw);
+    // v4.13: before the three-way setting, 'rows' still sent items with a Strip Row above. Keep how saved timelines look.
+    if (!parsed.msPlacementV2) { if (parsed.milestonePlacement === 'rows') parsed.milestonePlacement = 'mixed'; parsed.msPlacementV2 = true; }
     return { ...structuredClone(SETTINGS_DEFAULTS), ...parsed,
              swimlaneColors: stripSeedColors(parsed.swimlaneColors),
              themePack: THEME_PACKS[parsed.themePack] ? parsed.themePack : 'corporate-blue' };
@@ -2502,11 +2507,12 @@ function render() {
   const range = computeRange(rows);
   const totalDays = dayDiff(range.end, range.start) + 1;
   // v4.7: optionally pull milestones, events and decisions out of the swimlanes into a strip above the timescale
-  const above = SETTINGS.milestonePlacement === 'above';
+  const placement = SETTINGS.milestonePlacement;
   const isMs = r => !(r._start && r._end) && !!r._at;
   // v4.12: an item pinned to a strip row (Milestone Row 1-6) goes above the timescale even when the
   // global setting keeps milestones in their swimlanes
-  const inStrip = r => isMs(r) && (above || parseInt(r.MilestoneTier, 10) >= 1);
+  // 'rows' keeps every one in its swimlane; 'mixed' sends only items with a Strip Row; 'above' sends all
+  const inStrip = r => isMs(r) && (placement === 'above' || (placement === 'mixed' && parseInt(r.MilestoneTier, 10) >= 1));
   const msRows = rows.filter(inStrip);
   const bands = computeRowBands(rows.filter(r => !inStrip(r)));
 
@@ -3327,9 +3333,10 @@ function syncSettingsUi() {
   const cw = Number(SETTINGS.timelineWidth) || 1600;
   document.getElementById('sp-width').value = cw;
   document.getElementById('sp-width-val').textContent = cw === 1600 ? 'Auto' : `${cw} px`;
-  [['sp-scale', 'timescaleStyle', 'classic'], ['sp-ms', 'milestonePlacement', 'rows'], ['sp-lanelabel', 'laneLabelMode', 'wrap'], ['sp-pagelayout', 'pageLayout', 'centered'], ['sp-rowpack', 'rowPacking', 'auto']]
+  [['sp-scale', 'timescaleStyle', 'classic'], ['sp-ms', 'milestonePlacement', 'mixed'], ['sp-lanelabel', 'laneLabelMode', 'wrap'], ['sp-pagelayout', 'pageLayout', 'centered'], ['sp-rowpack', 'rowPacking', 'auto']]
     .forEach(([id, key, dflt]) => document.querySelectorAll('#' + id + ' button')
       .forEach(b => b.classList.toggle('on', b.dataset.v === (SETTINGS[key] || dflt))));
+  updateMsNote();
   document.getElementById('sp-tabw').value = L.laneTabW;
   document.getElementById('sp-subw').value = L.subLaneW;
   document.getElementById('sp-tabw-val').textContent = `${L.laneTabW} px`;
@@ -3462,6 +3469,28 @@ function bindSlider(id, apply) {
     updateSliderLabels();
   });
 }
+// v4.13: says how many items carry a Strip Row, since that decides what "As set per item" shows
+function updateMsNote() {
+  const note = document.getElementById('sp-ms-note');
+  const pinned = mergedRows().filter(r => parseInt(r.MilestoneTier, 10) >= 1);
+  note.hidden = !pinned.length;
+  if (!pinned.length) return;
+  const n = pinned.length, mode = SETTINGS.milestonePlacement;
+  const what = mode === 'mixed' ? `${n === 1 ? 'It goes' : 'They go'} above the timeline.`
+             : mode === 'above' ? 'Strip Row picks the row each one uses.'
+             : `${n === 1 ? 'It stays' : 'They stay'} in ${n === 1 ? 'its swimlane' : 'their swimlanes'} with this choice.`;
+  note.innerHTML = `${n} item${n === 1 ? ' has' : 's have'} a Strip Row set. ${what} <button type="button" class="sp-link" id="sp-ms-clear">Clear Strip Rows</button>`;
+  document.getElementById('sp-ms-clear').addEventListener('click', () => {
+    pinned.forEach(r => {
+      const i = findAddedIndex(r._rowKey);
+      if (i >= 0) SETTINGS.addedItems[i] = { ...SETTINGS.addedItems[i], MilestoneTier: null };
+      else SETTINGS.dataOverlay = { ...(SETTINGS.dataOverlay || {}), [r._rowKey]: { ...((SETTINGS.dataOverlay || {})[r._rowKey] || {}), MilestoneTier: null } };
+    });
+    pushHistory(); saveSettings(); applySettings(); render(); syncSettingsUi();
+    toast(`Cleared Strip Row on ${n} item${n === 1 ? '' : 's'} (Ctrl+Z to undo)`);
+  });
+}
+
 // v4.7: timescale shape, milestone placement, swimlane label mode
 [['sp-scale', 'timescaleStyle'], ['sp-ms', 'milestonePlacement'], ['sp-lanelabel', 'laneLabelMode'], ['sp-pagelayout', 'pageLayout'], ['sp-rowpack', 'rowPacking']].forEach(([id, key]) =>
   document.querySelectorAll('#' + id + ' button').forEach(b => b.addEventListener('click', () => {
@@ -4529,7 +4558,7 @@ const TEMPLATE_COLUMNS = [
     hint: 'Bar ends for a task or phase. Leave blank: tasks get Chevron, phases get Pill.',
     list: ['Flat', 'Chevron', 'Pill'] },
   { h: 'Milestone Row', w: 18, kind: 'mono', req: false, accepts: 'Whole number 1 to 6',
-    what: 'Moves a milestone, event or decision out of its swimlane into that row of the strip above the timescale. Blank keeps it in its swimlane.', ex: '2',
+    what: 'Moves a milestone, event or decision out of its swimlane into that row of the strip above the timescale, with the Lanetrace setting Milestones: As set per item (the default). Blank keeps it in its swimlane.', ex: '2',
     hint: 'Moves this milestone, event or decision into row 1 to 6 of the strip above the timescale. Blank keeps it in its swimlane.' },
   { h: 'Shown', w: 11, kind: 'text', req: false, accepts: 'Yes or No',
     what: 'No hides the item without deleting it. Blank shows it.', ex: 'No',
