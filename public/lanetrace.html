@@ -7326,9 +7326,10 @@ function renderMarkdown(text) {
   html = html.replace(/`([^`]+)`/g, '<code>$1</code>');
   // Links [text](url). v4.13: only web and mail addresses become links; a leftover placeholder shows as plain text
   html = html.replace(/\[([^\]]+)\]\(([^)]+)\)/g, (m, t, u) =>
-    /^(https?:\/\/|mailto:)/i.test(u.trim()) ? `<a href="${u.trim()}" target="_blank" rel="noopener">${t}</a>` : t);
+    /^(https?:\/\/|mailto:|www\.)/i.test(u.trim()) ? `<a href="${/^www\./i.test(u.trim()) ? 'https://' + u.trim() : u.trim()}" target="_blank" rel="noopener">${t}</a>` : t);
   // v4.13: a bare web address is a link too
-  html = html.replace(/(^|[\s(])(https?:\/\/[^\s<]*[^\s<.,;:!?)])/gm, '$1<a href="$2" target="_blank" rel="noopener">$2</a>');
+  html = html.replace(/(^|[\s(])((?:https?:\/\/|www\.)[^\s<]*[^\s<.,;:!?)])/gm, (m, pre, u) =>
+    `${pre}<a href="${/^www\./i.test(u) ? 'https://' + u : u}" target="_blank" rel="noopener">${u}</a>`);
   // Ordered lists first, marked so the bullet wrap below leaves them alone
   html = html.replace(/^\d+\. (.+)$/gm, '<li class="o">$1</li>');
   html = html.replace(/(<li class="o">.*<\/li>\n?)+/g, '<ol>$&</ol>');
