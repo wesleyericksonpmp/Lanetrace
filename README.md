@@ -65,7 +65,7 @@ Core functionality works, but the project is still being polished for public rel
 - Optional milestone strip above the timescale, for all milestones or pinned ones
 - Today marker, or a custom "as of" date
 - Dependency arrows, off by default: turn them on in Settings or the command palette. Hover over an item to highlight its chain; conflicts draw red and dashed
-- Month/quarter/year grid and legend
+- Timescale rows that fit the date range (weeks for short projects, quarters for multi-year portfolios), grid and legend
 - Bar labels pick white or dark text for contrast, in every theme
 - Keyboard access: Tab to any item, Enter to edit
 

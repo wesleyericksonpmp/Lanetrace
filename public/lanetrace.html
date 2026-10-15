@@ -575,6 +575,7 @@ body.has-sandbox-banner header { margin-top:44px }
 .sync-status .text { flex:1; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap }
 .sync-status .ts { color:var(--muted); font-size:11px }
 .sp-hint { font-size:11px; color:var(--muted); line-height:1.4 }
+.sp-select { flex:1; padding:6px 8px; border:1px solid var(--border); border-radius:3px; background:var(--card); color:var(--text); font:inherit; font-size:12px }
 
 /* section header with right-aligned action link */
 .sp-lbl-row { display:flex; align-items:center; gap:8px }
@@ -777,6 +778,19 @@ body.has-sandbox-banner header { margin-top:44px }
           <button data-v="pill">Pill</button>
         </div>
       </div>
+      <div class="sp-row" style="margin-top:6px">
+        <label class="sp-hint" for="sp-tiers" style="min-width:42px">Rows</label>
+        <select id="sp-tiers" class="sp-select">
+          <option value="auto">Auto (fits the date range)</option>
+          <option value="y,q,m">Year · Quarter · Month</option>
+          <option value="y,q">Year · Quarter</option>
+          <option value="y,m">Year · Month</option>
+          <option value="q,m">Quarter · Month</option>
+          <option value="q,m,w">Quarter · Month · Week</option>
+          <option value="m,w">Month · Week</option>
+        </select>
+      </div>
+      <div class="sp-hint" id="sp-tiers-note"></div>
       <div class="sp-lbl" style="margin-top:6px">Milestones</div>
       <div class="sp-row">
         <div class="sp-seg" id="sp-ms">
@@ -1924,6 +1938,7 @@ const SETTINGS_DEFAULTS = {
   subLaneW: 155,               // v4.7: width of the sub-swimlane label column (px)
   todayMode: 'auto',        // v4.6: 'auto' follows the system date, 'custom' pins todayCustom
   todayCustom: '',          // v4.6: yyyy-mm-dd
+  timescaleTiers: 'auto',   // v4.13: 'auto' or a TIER_PRESETS key
   showToday: true,
   showElapsed: false,       // v4.13: a bar along the bottom of the timescale from the start to today
   showDeps: false,          // v4.12: dependency arrows, off by default
@@ -2073,12 +2088,17 @@ function layoutFor() {
   return {
     laneTabW: tabW, subLaneW: subW, labelCol: tabW + subW + 5, swimlaneFillW: subW + 5,
     // v4.13: the header is the timescale plus a gap; the Today badge hangs in that gap, so it gets room when shown
-    rowH, swPad: gap, headerH: timescaleH() + (SETTINGS.showToday ? 22 : Math.max(6, d.headerH - 54)),
+    rowH, swPad: gap, headerH: timescaleH() + headerGap(),
     barH: clampN(Math.round(d.barH * s), 6, Math.max(6, rowH - 4)),
     iconR: Math.max(3, Math.round(d.iconR * (1 + (s - 1) * .6))),
     fontItem: Math.max(7, Math.round(d.fontItem * fs)),
     fontLane: Math.max(9, Math.round(d.fontLane * fs))
   };
+}
+// v4.13: space under the timescale; the Today badge hangs in it, so it gets room when shown
+function headerGap() {
+  const d = DENSITY[SETTINGS.density] || DENSITY.compact;
+  return SETTINGS.showToday ? 22 : Math.max(6, d.headerH - 54);
 }
 function applySettings() {
   Object.assign(LAYOUT, layoutFor());
@@ -2523,10 +2543,15 @@ function render() {
   // width tuning — target ~1600px total; scale pxPerDay to fit
   const chartW = Number(SETTINGS.timelineWidth) || 1600;
   const targetTimelineWidth = chartW - LAYOUT.labelCol - LAYOUT.padX * 2;
+  // v4.13: the 2.4 px/day floor keeps month labels readable. Long ranges drop the month row, so they can shrink to fit.
+  const set = TIER_PRESETS[SETTINGS.timescaleTiers];
+  const noMonths = set ? !set.includes('month') && !set.includes('week') : totalDays > 800;
   LAYOUT.pxPerDay = chartW === 1600
-    ? Math.max(2.4, Math.min(5.5, targetTimelineWidth / totalDays))
+    ? Math.max(noMonths ? 0.6 : 2.4, Math.min(5.5, targetTimelineWidth / totalDays))
     : Math.max(0.8, Math.min(14, targetTimelineWidth / totalDays));
   const tlW = totalDays * LAYOUT.pxPerDay;
+  CUR_TIERS = resolveTiers(range, LAYOUT.pxPerDay);     // v4.13: header height depends on the number of rows
+  LAYOUT.headerH = timescaleH() + headerGap();
   const svgW = LAYOUT.labelCol + tlW + LAYOUT.padX * 2;
 
   // v4.1 — each band gets at least one row's worth of height so empty bands stay visible
@@ -2575,6 +2600,51 @@ function render() {
 
 // v4.7: timescale shapes. classic = three flat bands, rounded = same bands in a rounded bar,
 // pill = a single rounded row of months.
+// v4.13: timescale rows. Units run from the top row down; 'auto' picks them from the date range and zoom.
+const TIER_PRESETS = {
+  'y,q,m': ['year', 'quarter', 'month'], 'y,q': ['year', 'quarter'], 'y,m': ['year', 'month'],
+  'q,m': ['quarter', 'month'], 'm,w': ['month', 'week'], 'q,m,w': ['quarter', 'month', 'week']
+};
+let CUR_TIERS = ['year', 'quarter', 'month'];
+function resolveTiers(range, ppd) {
+  const set = TIER_PRESETS[SETTINGS.timescaleTiers];
+  if (set) return set;
+  const span = dayDiff(range.end, range.start) + 1;
+  if (span <= 100) return ['month', 'week'];                       // a few weeks to a quarter
+  if (span <= 800) return 30 * ppd >= 22 ? ['year', 'quarter', 'month'] : ['year', 'quarter'];
+  return 91 * ppd >= 26 ? ['year', 'quarter'] : ['year'];           // multi-year portfolios
+}
+// One unit's segments across the range, each with label candidates from longest to shortest
+function tierSegments(unit, range, isTop) {
+  const segs = [];
+  const push = (start, nextStart, labels) => {
+    const end = new Date(Math.min(nextStart - 864e5, range.end));
+    segs.push({ start: start < range.start ? range.start : start, end, labels });
+  };
+  let cur;
+  if (unit === 'year') {
+    for (cur = new Date(range.start.getFullYear(), 0, 1); cur <= range.end; cur = new Date(cur.getFullYear() + 1, 0, 1))
+      push(cur, new Date(cur.getFullYear() + 1, 0, 1), [String(cur.getFullYear()), "'" + String(cur.getFullYear()).slice(2)]);
+  } else if (unit === 'quarter') {
+    for (cur = new Date(range.start.getFullYear(), Math.floor(range.start.getMonth() / 3) * 3, 1); cur <= range.end; cur = addMonths(cur, 3)) {
+      const q = `Q${Math.floor(cur.getMonth() / 3) + 1}`;
+      push(cur, addMonths(cur, 3), isTop ? [`${q} ${cur.getFullYear()}`, q] : [q]);
+    }
+  } else if (unit === 'month') {
+    for (cur = monthStart(range.start); cur <= range.end; cur = addMonths(cur, 1)) {
+      const long = cur.toLocaleDateString('en-US', { month: 'long' }), short = long.slice(0, 3);
+      push(cur, addMonths(cur, 1), isTop ? [`${long} ${cur.getFullYear()}`, `${short} ${cur.getFullYear()}`, short, short[0]] : [short, short[0]]);
+    }
+  } else {                                                           // weeks start on Monday
+    cur = new Date(range.start); cur.setDate(cur.getDate() - ((cur.getDay() + 6) % 7));
+    for (; cur <= range.end; cur = new Date(cur.getFullYear(), cur.getMonth(), cur.getDate() + 7))
+      push(cur, new Date(cur.getFullYear(), cur.getMonth(), cur.getDate() + 7), cur < range.start ? [] : [String(cur.getDate())]);   // a week cut off by the range start stays unlabeled
+  }
+  return segs;
+}
+const TIER_ROW_H = 18;
+// Height of the drawn timescale, so the Today badge and the first row line up with its real bottom edge
+function timescaleH() { return SETTINGS.timescaleStyle === 'pill' ? 30 : CUR_TIERS.length * TIER_ROW_H; }
 function renderHeader(range, dateToX, tlW, x0, y0) {
   const style = SETTINGS.timescaleStyle;
   if (style === 'pill') return renderHeaderPill(range, dateToX, tlW, x0, y0);
@@ -2583,80 +2653,44 @@ function renderHeader(range, dateToX, tlW, x0, y0) {
 }
 function renderHeaderRounded(range, dateToX, tlW, x0, y0) {
   const inner = renderHeaderClassic(range, dateToX, tlW, x0, y0);
-  const ticks = [];
-  let cur = addMonths(new Date(range.start), 1);
-  while (cur <= range.end) {
-    const x = dateToX(cur);
-    ticks.push(`<line x1="${x}" y1="${y0 + 38}" x2="${x}" y2="${y0 + 52}" stroke="#ffffff" stroke-opacity=".22" />`);
-    cur = addMonths(cur, 1);
-  }
-  return `<defs><clipPath id="tl-scale-clip"><rect x="${x0}" y="${y0}" width="${tlW}" height="54" rx="10" /></clipPath></defs>` +
+  const h = timescaleH(), yb = y0 + h - TIER_ROW_H;
+  const ticks = tierSegments(CUR_TIERS[CUR_TIERS.length - 1], range, CUR_TIERS.length === 1).slice(1).map(sg => {
+    const x = dateToX(sg.start);
+    return `<line x1="${x}" y1="${yb + 2}" x2="${x}" y2="${y0 + h - 2}" stroke="#ffffff" stroke-opacity=".22" />`;
+  });
+  return `<defs><clipPath id="tl-scale-clip"><rect x="${x0}" y="${y0}" width="${tlW}" height="${h}" rx="10" /></clipPath></defs>` +
          `<g clip-path="url(#tl-scale-clip)">${inner}${ticks.join('')}</g>`;
 }
+// Pill: one rounded row of the lowest unit
 function renderHeaderPill(range, dateToX, tlW, x0, y0) {
   const h = 30, parts = [];
   parts.push(`<rect x="${x0}" y="${y0}" width="${tlW}" height="${h}" rx="${h / 2}" fill="var(--scale-q)" />`);
-  let cur = new Date(range.start);
-  while (cur <= range.end) {
-    const end = monthEnd(cur) > range.end ? range.end : monthEnd(cur);
-    const xa = dateToX(cur), xb = dateToX(end) + LAYOUT.pxPerDay;
-    const first = cur.getTime() === range.start.getTime();
-    if (!first) parts.push(`<line x1="${xa}" y1="${y0 + 7}" x2="${xa}" y2="${y0 + h - 7}" stroke="#ffffff" stroke-opacity=".3" />`);
-    const mon = cur.toLocaleDateString('en-US', { month: 'short' });
-    const full = (first || cur.getMonth() === 0) ? `${mon} ${cur.getFullYear()}` : mon;
-    const room = xb - xa - 6;
-    const txt = textW(full, 11, 600) <= room ? full : (textW(mon, 11, 600) <= room ? mon : '');
+  const unit = CUR_TIERS[CUR_TIERS.length - 1];
+  tierSegments(unit, range, true).forEach((sg, i) => {
+    const xa = dateToX(sg.start), xb = dateToX(sg.end) + LAYOUT.pxPerDay;
+    if (i) parts.push(`<line x1="${xa}" y1="${y0 + 7}" x2="${xa}" y2="${y0 + h - 7}" stroke="#ffffff" stroke-opacity=".3" />`);
+    // a week's label is only its day, so the first week of each month also names the month
+    const labels = unit === 'week' && sg.labels.length && (i <= 1 || sg.start.getDate() <= 7)
+      ? [`${sg.start.toLocaleDateString('en-US', { month: 'short' })} ${sg.labels[0]}`, sg.labels[0]] : sg.labels;
+    const txt = labels.find(t => textW(t, 11, 600) <= xb - xa - 6);
     if (txt) parts.push(`<text x="${(xa + xb) / 2}" y="${y0 + h / 2 + 4}" fill="#ffffff" font-size="11" font-weight="600" text-anchor="middle">${txt}</text>`);
-    cur = addMonths(cur, 1);
-  }
+  });
   return parts.join('');
 }
 function renderHeaderClassic(range, dateToX, tlW, x0, y0) {
-  const parts = [];
-  // year row
-  const years = [];
-  let cur = new Date(range.start);
-  while (cur <= range.end) {
-    const yrEnd = new Date(cur.getFullYear(), 11, 31);
-    const clipped = yrEnd > range.end ? range.end : yrEnd;
-    years.push({ year: cur.getFullYear(), start: cur, end: clipped });
-    cur = new Date(cur.getFullYear() + 1, 0, 1);
-  }
-  years.forEach(y => {
-    const x = dateToX(y.start);
-    const w = dateToX(y.end) - x + LAYOUT.pxPerDay;
-    parts.push(`<rect x="${x}" y="${y0}" width="${w}" height="18" fill="var(--scale-year)" />`);
-    parts.push(`<text x="${x + w/2}" y="${y0 + 13}" fill="#fff" font-size="12" font-weight="700" text-anchor="middle">${y.year}</text>`);
+  const parts = [], n = CUR_TIERS.length;
+  const fills = n === 3 ? ['--scale-year', '--scale-q', '--scale-mo'] : n === 2 ? ['--scale-year', '--scale-mo'] : ['--scale-q'];
+  const fonts = n === 3 ? [[12, 700], [10, 600], [9, 500]] : n === 2 ? [[12, 700], [10, 500]] : [[12, 700]];
+  CUR_TIERS.forEach((unit, row) => {
+    const y = y0 + row * TIER_ROW_H, [fs, fw] = fonts[row];
+    tierSegments(unit, range, row === 0).forEach(sg => {
+      const xa = dateToX(sg.start), xb = dateToX(sg.end) + LAYOUT.pxPerDay;
+      parts.push(`<rect x="${xa}" y="${y}" width="${xb - xa}" height="${TIER_ROW_H}" fill="var(${fills[row]})" />`);
+      const txt = sg.labels.find(t => textW(t, fs, fw) <= xb - xa - 4);   // shorter labels, then none, as space runs out
+      if (txt) parts.push(`<text x="${(xa + xb) / 2}" y="${y + TIER_ROW_H / 2 + fs / 2 - 1}" fill="#fff" font-size="${fs}" font-weight="${fw}" text-anchor="middle">${txt}</text>`);
+    });
   });
-
-  // quarter row
-  cur = new Date(range.start.getFullYear(), Math.floor(range.start.getMonth()/3)*3, 1);
-  while (cur <= range.end) {
-    const qStart = new Date(cur);
-    const qEnd = new Date(cur.getFullYear(), cur.getMonth() + 3, 0);
-    const clipped = qEnd > range.end ? range.end : qEnd;
-    const xa = dateToX(qStart < range.start ? range.start : qStart);
-    const xb = dateToX(clipped) + LAYOUT.pxPerDay;
-    parts.push(`<rect x="${xa}" y="${y0 + 18}" width="${xb - xa}" height="18" fill="var(--scale-q)" />`);
-    parts.push(`<text x="${(xa + xb)/2}" y="${y0 + 31}" fill="#fff" font-size="10" font-weight="600" text-anchor="middle">Q${Math.floor(cur.getMonth()/3)+1}</text>`);
-    cur = new Date(cur.getFullYear(), cur.getMonth() + 3, 1);
-  }
-
-  // month row
-  cur = new Date(range.start);
-  while (cur <= range.end) {
-    const mStart = cur;
-    const mEnd = monthEnd(cur);
-    const clipped = mEnd > range.end ? range.end : mEnd;
-    const xa = dateToX(mStart);
-    const xb = dateToX(clipped) + LAYOUT.pxPerDay;
-    parts.push(`<rect x="${xa}" y="${y0 + 36}" width="${xb - xa}" height="18" fill="var(--scale-mo)" />`);
-    parts.push(`<text x="${(xa + xb)/2}" y="${y0 + 49}" fill="#fff" font-size="9" font-weight="500" text-anchor="middle">${mStart.toLocaleDateString('en-US',{month:'short'})}</text>`);
-    cur = addMonths(cur, 1);
-  }
-
-  // header separator
-  parts.push(`<line x1="${x0}" y1="${y0 + 54}" x2="${x0 + tlW}" y2="${y0 + 54}" class="tl-sep" />`);
+  parts.push(`<line x1="${x0}" y1="${y0 + timescaleH()}" x2="${x0 + tlW}" y2="${y0 + timescaleH()}" class="tl-sep" />`);
   return parts.join('');
 }
 
@@ -2729,17 +2763,19 @@ function renderMilestoneStrip(strip, yS) {
 }
 
 function renderGrid(range, dateToX, yTop, yBottom) {
-  const parts = [];
-  let cur = new Date(range.start.getFullYear(), range.start.getMonth(), 1);
-  while (cur <= range.end) {
-    const x = dateToX(cur);
-    parts.push(`<line x1="${x}" y1="${yTop + LAYOUT.headerH}" x2="${x}" y2="${yBottom}" class="tl-grid-minor" />`);
+  const parts = [], y1 = yTop + LAYOUT.headerH;
+  // v4.13: lines at the lowest timescale row's boundaries, plus month starts when that row is weeks
+  const unit = CUR_TIERS[CUR_TIERS.length - 1];
+  const xs = new Map();
+  tierSegments(unit, range, false).forEach(sg => xs.set(sg.start.getTime(), sg.start));
+  if (unit === 'week') tierSegments('month', range, false).forEach(sg => xs.set(sg.start.getTime(), sg.start));
+  [...xs.values()].sort((a, b) => a - b).forEach(d => {
+    const x = dateToX(d);
+    parts.push(`<line x1="${x}" y1="${y1}" x2="${x}" y2="${yBottom}" class="tl-grid-minor" />`);
     // stronger line at quarter boundaries
-    if (SETTINGS.showQuarterEmphasis && cur.getMonth() % 3 === 0) {
-      parts.push(`<line x1="${x}" y1="${yTop + LAYOUT.headerH}" x2="${x}" y2="${yBottom}" class="tl-grid-major" />`);
-    }
-    cur = addMonths(cur, 1);
-  }
+    if (SETTINGS.showQuarterEmphasis && d.getDate() === 1 && d.getMonth() % 3 === 0)
+      parts.push(`<line x1="${x}" y1="${y1}" x2="${x}" y2="${yBottom}" class="tl-grid-major" />`);
+  });
   return parts.join('');
 }
 
@@ -3206,8 +3242,6 @@ function dateLabel(r) {
   return '';
 }
 
-// v4.13: height of the drawn timescale, so the Today badge and the first row line up with its real bottom edge
-function timescaleH() { return SETTINGS.timescaleStyle === 'pill' ? 30 : 54; }
 
 // v4.13: the Today badge hangs from the bottom edge of the timescale with a notch at the exact date. The line is
 // thin and solid and draws under the items; the badge draws on top. Returns { under, over } so render() can layer them.
@@ -3358,6 +3392,11 @@ function syncSettingsUi() {
     .forEach(([id, key, dflt]) => document.querySelectorAll('#' + id + ' button')
       .forEach(b => b.classList.toggle('on', b.dataset.v === (SETTINGS[key] || dflt))));
   updateMsNote();
+  document.getElementById('sp-tiers').value = TIER_PRESETS[SETTINGS.timescaleTiers] ? SETTINGS.timescaleTiers : 'auto';
+  { const names = { year: 'Year', quarter: 'Quarter', month: 'Month', week: 'Week' };
+    document.getElementById('sp-tiers-note').textContent = SETTINGS.timescaleStyle === 'pill'
+      ? `Pill shows one row: ${names[CUR_TIERS[CUR_TIERS.length - 1]]}.`
+      : (TIER_PRESETS[SETTINGS.timescaleTiers] ? '' : `Showing ${CUR_TIERS.map(t => names[t]).join(' · ')}.`); }
   document.getElementById('sp-tabw').value = L.laneTabW;
   document.getElementById('sp-subw').value = L.subLaneW;
   document.getElementById('sp-tabw-val').textContent = `${L.laneTabW} px`;
@@ -3549,6 +3588,9 @@ document.getElementById('sp-fit-width').addEventListener('click', () => {
   btn.addEventListener('click', () => { const open = btn.textContent === 'Expand all'; groups().forEach(d => { d.open = open; }); });
   syncExpandAll();
 })();
+document.getElementById('sp-tiers').addEventListener('change', ev => {
+  SETTINGS.timescaleTiers = ev.target.value; saveSettings(); applySettings(); render(); syncSettingsUi();
+});
 // v4.13: swimlane collapse and expand, also in the command palette
 document.getElementById('sp-lanes-collapse').addEventListener('click', () => setAllLanesCollapsed(true));
 document.getElementById('sp-lanes-expand').addEventListener('click', () => setAllLanesCollapsed(false));

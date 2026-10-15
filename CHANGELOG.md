@@ -8,6 +8,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- Timescale rows (Settings > Timeline > Timescale > Rows). Auto, the default, fits the date range: Month · Week up to about 3 months, Year · Quarter · Month up to about 2 years, Year · Quarter beyond that. You can also pick Year · Quarter · Month, Year · Quarter, Year · Month, Quarter · Month, Quarter · Month · Week or Month · Week. Labels shorten (January 2026, Jan, J) or drop out when space runs out. Grid lines follow the lowest row. Pill shows the lowest row
+- Timelines longer than about 2 years now fit the default width. The month row kept the chart from shrinking below 2.4 px per day, so a 3-year portfolio scrolled sideways with about 18 months in view
 - Settings panel: Expand all (or Collapse all once every section is open) in the header, and Collapse all and Expand all swimlane buttons in the Swimlanes section, next to Reset colors
 - Elapsed time: an optional red bar along the bottom of the timescale from the start of the chart to today (Settings > Timeline > Timeline chrome)
 
