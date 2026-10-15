@@ -406,6 +406,7 @@ body.has-sandbox-banner header { margin-top:44px }
 .edit-toolbar button:hover { background:var(--card); border-color:var(--border); color:var(--text) }
 .edit-toolbar button svg { width:14px; height:14px; stroke:currentColor; fill:none; stroke-width:2 }
 .edit-toolbar .sep { width:1px; background:var(--border); margin:2px 4px }
+.edit-toolbar select { height:26px; padding:0 6px; font:inherit; font-size:12px; color:var(--text); background:var(--card); border:1px solid var(--border); border-radius:3px }
 .field .hint { font-size:11px; color:var(--muted) }
 .field .char-hint { font-weight:400; text-transform:none; color:var(--muted); font-size:10px }
 .field-row { display:flex; gap:10px } .field-row .field { flex:1 }
@@ -1072,9 +1073,14 @@ body.has-sandbox-banner header { margin-top:44px }
         <div class="field">
           <label for="f-notes">Notes <span class="char-hint">(supports Markdown)</span></label>
           <div class="edit-toolbar" id="notes-toolbar">
+            <select id="notes-style" title="Text style" aria-label="Text style">
+              <option value="p">Normal</option><option value="h1">Heading 1</option><option value="h2">Heading 2</option><option value="h3">Heading 3</option>
+            </select>
+            <span class="sep"></span>
             <button type="button" data-md="bold" title="Bold (Ctrl+B)"><svg viewBox="0 0 24 24"><path d="M6 4h8a4 4 0 0 1 4 4 4 4 0 0 1-4 4H6z"/><path d="M6 12h9a4 4 0 0 1 4 4 4 4 0 0 1-4 4H6z"/></svg></button>
             <button type="button" data-md="italic" title="Italic (Ctrl+I)"><svg viewBox="0 0 24 24"><line x1="19" y1="4" x2="10" y2="4"/><line x1="14" y1="20" x2="5" y2="20"/><line x1="15" y1="4" x2="9" y2="20"/></svg></button>
             <span class="sep"></span>
+            <button type="button" data-md="ol" title="Numbered list"><svg viewBox="0 0 24 24"><line x1="10" y1="6" x2="21" y2="6"/><line x1="10" y1="12" x2="21" y2="12"/><line x1="10" y1="18" x2="21" y2="18"/><path d="M4 6h1v4"/><path d="M4 10h2"/><path d="M6 18H4c0-1 2-2 2-3s-1-1.5-2-1"/></svg></button>
             <button type="button" data-md="ul" title="Bullet list"><svg viewBox="0 0 24 24"><line x1="9" y1="6" x2="20" y2="6"/><line x1="9" y1="12" x2="20" y2="12"/><line x1="9" y1="18" x2="20" y2="18"/><circle cx="4" cy="6" r="1.5"/><circle cx="4" cy="12" r="1.5"/><circle cx="4" cy="18" r="1.5"/></svg></button>
             <span class="sep"></span>
             <button type="button" data-md="link" title="Insert link"><svg viewBox="0 0 24 24"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/></svg></button>
@@ -7194,6 +7200,10 @@ document.addEventListener('keydown', ev => {
         insert = `- ${selected || 'List item'}`;
         cursorOffset = insert.length;
         break;
+      case 'ol':
+        insert = `1. ${selected || 'List item'}`;
+        cursorOffset = insert.length;
+        break;
       case 'link':
         insert = `[${selected || 'link text'}](url)`;
         cursorOffset = selected ? insert.length - 5 : 1;
@@ -7209,6 +7219,28 @@ document.addEventListener('keydown', ev => {
       textarea.selectionStart = textarea.selectionEnd = start + cursorOffset;
     }
   }
+
+  // Text style applies to the current line: replace any heading marker with the chosen one
+  const style = document.getElementById('notes-style');
+  const lineBounds = () => {
+    const v = textarea.value, a = v.lastIndexOf('\n', textarea.selectionStart - 1) + 1;
+    const e = v.indexOf('\n', textarea.selectionStart); return [a, e < 0 ? v.length : e];
+  };
+  const syncStyle = () => {
+    const [a, e] = lineBounds(), m = textarea.value.slice(a, e).match(/^(#{1,3}) /);
+    style.value = m ? 'h' + m[1].length : 'p';
+  };
+  style.addEventListener('change', () => {
+    const [a, e] = lineBounds();
+    const line = textarea.value.slice(a, e).replace(/^#{1,3} /, '');
+    const prefix = style.value === 'p' ? '' : '#'.repeat(Number(style.value[1])) + ' ';
+    textarea.focus();
+    textarea.setSelectionRange(a, e);
+    if (document.execCommand) document.execCommand('insertText', false, prefix + line);
+    else textarea.value = textarea.value.slice(0, a) + prefix + line + textarea.value.slice(e);
+    textarea.setSelectionRange(a + prefix.length + line.length, a + prefix.length + line.length);
+  });
+  ['keyup', 'click', 'focus'].forEach(t => textarea.addEventListener(t, syncStyle));
 
   toolbar.addEventListener('click', ev => {
     const btn = ev.target.closest('button[data-md]');
@@ -7242,11 +7274,12 @@ function renderMarkdown(text) {
   html = html.replace(/`([^`]+)`/g, '<code>$1</code>');
   // Links [text](url)
   html = html.replace(/\[([^\]]+)\]\(([^)]+)\)/g, '<a href="$2" target="_blank" rel="noopener">$1</a>');
+  // Ordered lists first, marked so the bullet wrap below leaves them alone
+  html = html.replace(/^\d+\. (.+)$/gm, '<li class="o">$1</li>');
+  html = html.replace(/(<li class="o">.*<\/li>\n?)+/g, '<ol>$&</ol>');
   // Unordered lists
   html = html.replace(/^- (.+)$/gm, '<li>$1</li>');
   html = html.replace(/(<li>.*<\/li>\n?)+/g, '<ul>$&</ul>');
-  // Ordered lists
-  html = html.replace(/^\d+\. (.+)$/gm, '<li>$1</li>');
   // Paragraphs (double newline)
   html = html.replace(/\n\n/g, '</p><p>');
   // Single newlines to <br> inside paragraphs
