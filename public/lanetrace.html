@@ -162,6 +162,12 @@ svg { display:block; user-select:none }
 .data-grid .row-info:hover { background:rgba(0,114,206,.1); color:var(--blue) }
 .data-grid .row-more:hover { background:rgba(0,0,0,.08); color:var(--text) }
 .data-grid .row-info svg, .data-grid .row-more svg { width:15px; height:15px; stroke:currentColor }
+/* v4.13: open and menu buttons appear on hover, selection or keyboard focus; the notes icon always shows */
+.data-grid .row-info, .data-grid .row-more { opacity:0; transition:opacity .12s }
+.data-grid tbody tr:hover .row-info, .data-grid tbody tr:hover .row-more,
+.data-grid tbody tr.row-selected .row-info, .data-grid tbody tr.row-selected .row-more,
+.data-grid tbody tr:focus-within .row-info, .data-grid tbody tr:focus-within .row-more { opacity:1 }
+@media (hover: none) { .data-grid .row-info, .data-grid .row-more { opacity:1 } }
 .data-grid td.col-actions, .data-grid th.col-actions { width:88px; text-align:center; background:var(--card); white-space:nowrap }
 .data-grid .row-notes { display:inline-flex; align-items:center; justify-content:center; width:24px; height:24px; color:var(--muted); cursor:help; vertical-align:middle }
 .data-grid .row-notes svg { width:14px; height:14px; stroke:currentColor }
@@ -1019,6 +1025,8 @@ body.has-sandbox-banner header { margin-top:44px }
 
 <div id="row-context-menu" class="context-menu">
   <button data-action="open">Open item</button>
+  <button data-action="duplicate">Duplicate</button>
+  <button data-action="toggle-shown" id="ctx-toggle-shown">Hide from timeline</button>
   <hr>
   <button data-action="insert-above">Insert row above</button>
   <button data-action="insert-below">Insert row below</button>
@@ -5660,15 +5668,22 @@ function updateAppearanceSummary() {
 ['f-labelpos', 'f-titlecolor', 'f-barstyle', 'f-shape', 'f-mtier', 'f-shown'].forEach(id =>
   document.getElementById(id).addEventListener('change', () => updateAppearanceSummary()));
 
+// v4.13: one duplicate for the item form and the row menu. The copy gets the next Row ID.
+function duplicateRow(fields) {
+  const { _rowKey, RowID, ...rest } = fields;
+  const nextId = Math.max(0, ...mergedRows().map(r => Number(r.RowID) || 0)) + 1;
+  const key = 'new_' + Date.now().toString(36) + '_' + Math.random().toString(36).slice(2, 6);
+  SETTINGS.addedItems = [...(SETTINGS.addedItems || []), { ...rest, RowID: nextId, Title: (rest.Title || '') + ' (copy)', _rowKey: key }];
+  pushHistory();  // Push AFTER changes
+  saveSettings(); applySettings(); syncSettingsUi(); render();
+  toast('Duplicated (Ctrl+Z to undo)');
+  return key;
+}
 function duplicateFromEditor() {
   if (EDITOR.isNew) { toast('Save the new item first, then duplicate', 'err'); return; }
   const patch = readEditorForm();
-  const clone = { ...patch, Title: (patch.Title || '') + ' (copy)', _rowKey: 'new_' + Date.now().toString(36) + '_' + Math.random().toString(36).slice(2, 6) };
-  SETTINGS.addedItems = [...(SETTINGS.addedItems || []), clone];
-  pushHistory();  // Push AFTER changes
-  saveSettings(); applySettings(); syncSettingsUi(); render();
   closeEditor();
-  toast('Duplicated (Ctrl+Z to undo)');
+  duplicateRow(patch);
 }
 
 function deleteFromEditor() {
@@ -7096,6 +7111,8 @@ let CONTEXT_MENU = { rowKey: null };
 
 function showContextMenu(x, y) {
   const menu = document.getElementById('row-context-menu');
+  const r = CONTEXT_MENU.rowKey && findRow(CONTEXT_MENU.rowKey);
+  document.getElementById('ctx-toggle-shown').textContent = r && !isRowShown(r) ? 'Show on timeline' : 'Hide from timeline';
   menu.style.left = x + 'px';
   menu.style.top = y + 'px';
   menu.classList.add('on');
@@ -7115,6 +7132,8 @@ document.getElementById('row-context-menu').addEventListener('click', ev => {
   const rowKey = CONTEXT_MENU.rowKey;
   hideContextMenu();
   if (action === 'open') openEditor(rowKey);
+  else if (action === 'duplicate') { const r = findRow(rowKey); if (r) { const k = duplicateRow(r); if (SETTINGS.activeView === 'data') selectRow(k); } }
+  else if (action === 'toggle-shown') { const r = findRow(rowKey); if (r) applyCellEdit(rowKey, 'IsShown', !isRowShown(r)); }
   else if (action === 'insert-above') gridInsertRow(rowKey, 'above');
   else if (action === 'insert-below') gridInsertRow(rowKey, 'below');
   else if (action === 'delete') deleteGridRow(rowKey);

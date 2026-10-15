@@ -16,6 +16,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 - Today marker: the badge hangs from the bottom edge of the timescale with a notch at the exact date, in every density and timescale shape. Before, it drifted with density: over the month names in Ultra, inside the month row in Compact, half on and half off in Normal. The line is thin and solid and draws under the items, so it no longer strikes through labels
+- Data view Quick look: the open and menu buttons appear when you hover over a row, select it or tab into it; the notes icon always shows. Touch screens always show them. The row menu adds Duplicate and Hide from timeline (Show on timeline for hidden items)
 - Notes toolbar: a text style list (Normal, Heading 1, 2, 3) that applies to the current line, then bold, italic, numbered list and bullet list. Headings and numbered lists were missing from the 4.12.0 toolbar. The link button is removed for now, because links in notes could not be clicked anywhere in the app
 
 ### Fixed
@@ -23,6 +24,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - In Ultra density the first row started 4px inside the timescale. The space under the timescale is now the same in every density, with room for the Today badge
 - Labels set to Above or Below ran past the right edge of the chart when their item sat near it, such as "General Availability · Mar 15" at narrower widths. Centered labels now slide inward at both edges
 - Labels set to Left on items at the start of the timeline ran into the swimlane names. They now move to the right of the item when the left has no room
+- Duplicate gave the copy no Row ID, which broke Depends on references and Excel round trips. Copies now get the next Row ID
 - Numbered lists in notes showed as unnumbered items in tooltips and the item card
 
 ## [4.12.0] - 2026-10-15
