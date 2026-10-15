@@ -1,0 +1,126 @@
+# Changelog
+
+All notable changes to Lanetrace will be documented in this file.
+
+The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
+and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
+
+## [Unreleased]
+
+### Added
+- Dependencies: a Depends on column takes the Row IDs of items that must finish before an item starts. It is in the Excel template, import, export, the Data view and the item form, where a picker adds items by title and each predecessor shows its finish date
+- The "needs attention" chip flags an item that starts before a predecessor finishes, a Row ID that matches no item, an item that depends on itself, and loops. Lanetrace never moves dates
+- Status update prompt: dependency conflicts go to DATA TO CONFIRM, a new DEPENDENCY RISKS block lists open items waiting on overdue or behind-pace work, and each item lists what it depends on
+- Sample data and the template's sample rows include dependencies
+- Dependency arrows, off by default. Turn them on with "Dependency arrows" in Settings > Timeline or from the command palette. Arrows run from the end of each predecessor to the start of its successor, go under the items, and leave milestones from the top or bottom so they miss the label. Hovering over or tabbing to an item highlights its whole chain and fades the rest. A conflict draws red and dashed. Items in a collapsed swimlane connect through its summary bar. Exports include the arrows when they are on
+
+### Changed
+- Flatter interface: 3px corners on every card, button, input, menu and dialog (they were 4 to 14px), and hairline borders instead of soft shadows. Focus rings are unchanged
+- Dark mode uses dark scrollbars and dark date pickers
+- A completed milestone, event or decision shows a check before its date ("Sign-off · ✓ Sep 30") instead of a small green dot on the marker, which read as a stray mark and relied on color alone
+- The Notes toolbar has four buttons: bold, italic, bullet list and link, the formatting the tooltip and template describe. Headings, numbered lists and code still render when typed
+
+## [4.12.0] - 2026-10-07
+
+First public release.
+
+### Added
+- Swimlane labels wrap by default (Wrap, Shrink or Truncate), with adjustable label and sub-swimlane widths
+- Swimlanes without sub-swimlanes show a wide horizontal label; with sub-swimlanes the name runs vertically in the tab
+- Timescale shapes: Classic, Rounded, and a single-row Pill
+- Option to place milestones, events, and decisions in a strip above the timescale
+- Today marker follows the system date and moves at midnight; optional custom "as of" date in Settings
+- Font picker using system fonts only (applies to the page and all exports)
+- Fine-tune sliders for row height, swimlane spacing, and timeline width on top of the density presets, plus a reset-display icon
+- Status update dialog: builds a copyable prompt from current dates and progress, and copies the timeline image for email
+- Load warnings for missing required columns and for rows skipped because they have no title
+- Labels that cross the edge of the progress fill draw in two colors, one for each background
+- Unreadable or impossible dates show in the "needs attention" chip with the original value
+- Timeline items are keyboard accessible: Tab reaches each item, its tooltip shows on focus, Enter or Space opens the editor, and screen readers announce title, type, dates and % complete
+- Closing the item editor returns focus to the item that opened it, including after a save
+- Collapsible swimlanes: click a swimlane name (or Tab to it and press Enter) to show it as one summary bar with its date span, item count and duration-weighted % complete. Click the summary bar to expand. "Collapse all" and "Expand all" are in the command palette (Ctrl+K). The chevrons stay out of exports and print
+- Row layout "Auto", the new default: one item per row up to 100 items, then Compact. At 2,000 items this cuts the chart from about 56,000 px tall to 11,500 px. Existing saved choices are kept
+- Favicon: the lane mark from the design notes
+- Swimlane label color: an "Aa" button in Settings > Swimlanes cycles Auto, White and Dark for each swimlane, previews the result on the lane color, and warns below 3:1 contrast. Undo, rename and Reset colors cover it
+- Redesigned Excel template:
+  - Styled header (blue = required, ink = optional), sized columns, no gridlines, frozen header and title columns, filter buttons, landscape print fit to one page wide
+  - Dropdowns for Item Type, Label Position, Milestone Shape, Bar Style, Shown and Title Color; range checks for dates, % Complete and Milestone Row; a hint on every column when a cell is selected
+  - Real date and number cells instead of text
+  - Sample rows dated from the current month, covering every item type
+  - Instructions sheet: quick start, column reference with accepted values and examples, item types, how Lanetrace reads your data, glossary, and load messages with fixes
+- Export to Excel and Export to CSV (Settings > Export & share, the Data view toolbar, and the command palette). Exports every item with your edits, hidden items as Shown = No, and custom columns. The Excel file uses the template layout and loads back into Lanetrace unchanged; the CSV is UTF-8 for other tools
+- Initial open-source release
+- Generic sample program for the built-in demo data
+- Documentation for data format, design, and SharePoint compatibility
+
+### Changed
+- Bar label color follows contrast with the item's color instead of % complete. Every label in every theme pack, light and dark, now reaches 4.5:1
+- Each theme pack has fixed bar label colors: white plus the pack's darkest color. Dark mode previously used one light color for both
+- Fifteen lane colors in the Nord, Dracula, Solarized, Warm, Catppuccin, Gruvbox and Slate packs shifted 3-12% lighter or darker to reach 4.5:1. Corporate is unchanged
+- Bars run through the end of their end date, and a chevron's point lands on that date
+- Items with the same start and end date are milestones when Item Type is blank. Set Item Type to Task for a one-day bar
+- Item Type matching ignores case and surrounding spaces. Unknown values fall back to inference instead of drawing as milestones
+- Excel cells formatted as % (0.5 = 50%) import correctly, and % Complete is capped at 0-100
+- Shown accepts No, N, Off and Hidden in any case to hide an item. Anything else, or blank, shows it
+- The PowerPoint export library loads on the first PowerPoint export instead of at startup, pinned to 3.12.0 with an integrity check. The app makes no network requests until then. If the library cannot load, the export downloads a PNG and says why
+- Settings footer shows the license instead of a contact email
+- Editing a cell in the Data view rebuilds only that row, and the hidden timeline redraws once edits pause. At 2,000 rows an edit takes about 50 ms instead of about 1.1 s
+- Data view Notes show as one line of plain text, with the full note on hover, so rows keep an even height
+- The legend shows on the Timeline tab only
+- Swimlane labels pick white or dark text from each theme's own colors, matching bar labels, instead of a fixed dark color
+- Label Position and Milestone Shape import in any case ("above", "Flag")
+- Status update prompts:
+  - The app computes the suggested Red/Yellow/Green rating from a fixed rule and states the reason, instead of asking the model to judge "several items behind pace"
+  - Each audience gets its own format: the executive brief asks for exactly five labeled lines, steering committee leads with decisions needed, project team lists owners and next steps
+  - New KEY DATES block with the next milestone and next decision, even when they fall outside the look-ahead window
+  - "Coming up" includes in-progress work due inside the window, not only work that starts in it
+  - "Decisions not yet made" listed only the look-ahead window; it is now "Decisions due through <date>" plus the count of all open decisions
+  - New DATA TO CONFIRM block, checked by rule: progress recorded before an item starts, progress far ahead of the schedule, partial progress on single-date items, and open items with no owner. The model turns these into questions for the program manager
+  - Asks for a subject line, and writes [Program name] when the timeline title is still the default instead of calling the program "Lanetrace"
+- Milestone Row now moves a single milestone, event or decision into the strip above the timescale even when Settings keeps milestones in their swimlanes. "Auto" follows Settings
+- Sub-swimlane suggests the sub-swimlanes already used in the chosen swimlane, in the item editor and in the Data view; typing a new one still works
+- One item form everywhere. The Data view's slide-out detail panel is gone; its open button, the timeline, the command palette and New item all use the same form, with the same validation (a Phase needs a start date, every item needs an end date)
+- The item form is grouped into sections: item (Title first, type, owner, swimlane), Schedule (dates and % complete on one row), Notes, Appearance (folded, with a one-line summary; opens on its own when the item is hidden or its title has low contrast) and More fields (custom Data view columns). Bar Style is now in the form
+- Data view: "Add row" is now "New item" and opens the form titled "New item", pre-filled with the swimlane you filtered to. The new row gets the next Row ID and is selected and scrolled into view. Insert above and below still add blank rows for inline editing
+- Data view: a Quick look column after Title holds Open item, a notes indicator with a preview on hover, and the row menu. Delete moved into the row menu (and stays on the toolbar and the Delete key) so it is no longer one click away at the far right
+- Data view: Bar Style cells stay on one line, so every row has the same height
+- Product name from "Timeline Studio" to "Lanetrace"
+- Sample swimlanes to generic: Product, Engineering, Operations, Marketing, Customer Success
+
+### Fixed
+- Unreadable dates (15/01/2026, TBD) and impossible dates (2026-02-30) no longer blank the whole timeline
+- An inferred item type no longer sticks after the dates change, for example a milestone that gains a start date
+- Lowercase "true" or "Yes" in the Shown column no longer hides the item on import
+- Grid Shown checkbox matches the timeline: blank shows as checked, lowercase "no" as unchecked
+- Data format docs named the title column "Title"; the template and parser use "Milestone/Task Title"
+- Tab no longer lands on invisible controls inside closed panels and dialogs (38 controls before)
+- Help and the Excel template no longer claim drag-to-reposition or right-click on timeline items, which do not exist
+- The template downloads as Lanetrace-Template.xlsx instead of TimelineStudio-Template.xlsx
+- The template's sample milestones put their date in Start date, so they did not draw. Its instructions also had the date rules reversed, listed bar styles and shapes the app does not have, and called Color Category a name instead of a hex color
+- Milestone Shape and Bar Style columns were ignored on import
+- Copy to Clipboard crashed with "Cannot read properties of undefined (reading 'write')" where the browser offers no clipboard (previews, non-secure pages, some locked-down browsers). It now downloads the PNG and explains why
+- Items imported with dates like 3/31/2026 opened in the item form with empty date boxes, and saving would erase the dates. The form now converts them
+- Items added through the item form had no Row ID
+- The item editor's "New swimlane" field was never read on Save. Choosing "＋ New swimlane…" in the Swimlane list now shows a name field under it, and Save creates the swimlane and moves the item into it
+- Sub-swimlane separator lines no longer cut across the colored swimlane tab
+- PNG, clipboard, and PowerPoint exports now write all styles inline, removing black bands and serif text
+- Date-only values no longer display one day early in US time zones
+- PNG, clipboard, and PowerPoint exports now keep bands, grid lines, and fonts
+
+### Removed
+- Prototype sample data, replaced by the generic sample program
+
+## [0.1.0] - 2026-09-24
+
+### Added
+- Core timeline rendering engine
+- Excel import via drag-drop
+- Data grid view with inline editing
+- Undo/redo system
+- Command palette (Ctrl+K)
+- SVG, PDF, PowerPoint exports
+- Theme support (light/dark/auto)
+- Density options (ultra/compact/normal/spacious)
+- Theme packs
+- File System Access API sync (Chromium)
+- Accessibility improvements
