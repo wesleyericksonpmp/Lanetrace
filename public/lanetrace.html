@@ -515,8 +515,10 @@ body.has-sandbox-banner header { margin-top:44px }
 /* print stylesheet */
 @media print {
   header .controls, #settings-panel, #sp-backdrop, #tt, #modal-back, #palette-back,
-  #dropzone, #toast, #help-modal, #status-modal, #tl .tl-ui { display:none !important }
-  body { background:#fff }
+  #dropzone, #toast, #help-modal, #status-modal, #tl .tl-ui, .view-tabs, #issues-pop, #choice-back { display:none !important }
+  html, body { background:#fff !important }
+  /* v4.13: the timeline prints at its full width and was cut off at the right edge; scale it to the page */
+  #tl { width:100% !important; height:auto !important }
   .chart-card { border:0; box-shadow:none; padding:0; overflow:visible }
   main { padding:0 12px }
   header { border-bottom:1px solid #e6e9ee; box-shadow:none }
@@ -3988,6 +3990,15 @@ document.getElementById('sp-export-svg').addEventListener('click', () => {
 });
 
 // ── export PDF (via browser print) ───────────────────────────────────────
+// v4.13: printing (and Save as PDF) always uses light colors, like the image exports, then restores the theme
+window.addEventListener('beforeprint', () => {
+  if (document.documentElement.dataset.theme !== 'dark') return;
+  applyTheme('light'); render(); document.documentElement.dataset.printLight = '1';
+});
+window.addEventListener('afterprint', () => {
+  if (!document.documentElement.dataset.printLight) return;
+  delete document.documentElement.dataset.printLight; applyTheme(SETTINGS.theme); render();
+});
 document.getElementById('sp-export-pdf').addEventListener('click', () => {
   closePanel();
   setTimeout(() => window.print(), 200);  // brief delay to let panel close
