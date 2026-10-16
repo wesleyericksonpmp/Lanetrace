@@ -18,6 +18,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Elapsed time: an optional red bar along the bottom of the timescale from the start of the chart to today (Settings > Timeline > Timeline chrome)
 
 ### Changed
+- A more compact, modern layout:
+  - One-line header: title and dates, Timeline/Data, item count, then Filter, Key, Status update, Settings and a ⋯ menu with Help and the theme switch. The "Add a subtitle" hint shows only while hovering the title or editing
+  - The legend row is now a Key button that opens the swimlane colors and item shapes. Settings > Timeline chrome > Key button shows or hides it
+  - Larger bars and labels: Compact draws 20 px bars with 12 px labels (was 13 px and 10 px); Normal and Spacious grow to match
+  - Rows are packed by default, so items share a row when they do not overlap. Saved timelines keep their row layout
+  - Auto width fits the window, so the whole date range shows without sideways scrolling, and refits when the window is resized
 - Today marker: the badge hangs from the bottom edge of the timescale with a notch at the exact date, in every density and timescale shape. Before, it drifted with density: over the month names in Ultra, inside the month row in Compact, half on and half off in Normal. The line is thin and solid and draws under the items, so it no longer strikes through labels
 - Item form: Bar style and Marker shape are button pickers with drawn previews, matching the Data view, instead of text lists. Auto shows the shape the item will get
 - Data view Quick look: the open and menu buttons appear when you hover over a row, select it or tab into it; the notes icon always shows. Touch screens always show them. The row menu adds Duplicate and Hide from timeline (Show on timeline for hidden items)

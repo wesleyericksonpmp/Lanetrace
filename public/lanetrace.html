@@ -35,12 +35,22 @@
 *,*::before,*::after { box-sizing:border-box; margin:0; padding:0 }
 html, body { min-height:100%; font:14px/1.5 var(--font-ui);
              background:var(--bg); color:var(--text) }
-header { background:var(--card); border-bottom:1px solid var(--border); padding:20px 32px;
-         display:flex; align-items:center; gap:24px; flex-wrap:wrap }
-header .title { flex:1; min-width:280px }
-header h1 { font-size:20px; font-weight:700; margin:0 }
-header .sub { color:var(--muted); font-size:12px; margin-top:4px }
-header .meta { color:var(--muted); font-size:12px }
+/* v4.13: one-line header: title and dates, view switch, counts, then actions */
+header { background:var(--card); border-bottom:1px solid var(--border); padding:10px 24px; min-height:56px;
+         display:flex; align-items:center; gap:10px 14px; flex-wrap:wrap }
+header .title { display:flex; align-items:baseline; gap:10px; flex:0 1 auto; min-width:0; flex-wrap:wrap }
+header h1 { font-size:17px; font-weight:700; margin:0; white-space:nowrap }
+header .sub { color:var(--muted); font-size:12px; margin:0; white-space:nowrap }
+header .meta { color:var(--muted); font-size:12px; order:2; margin-right:auto }
+header .view-tabs { order:1 }
+header .controls { order:3 }
+/* the subtitle hint shows while hovering the title or editing; an empty subtitle takes no space otherwise */
+header .title:not(:hover) #tl-subtitle:empty:not(:focus) { display:none }
+header #tl-subtitle { margin:0 !important; font-size:13px }
+#help-btn, #theme-toggle { display:none !important }   /* in the ⋯ menu; their shortcuts still work */
+#legend-pop { position:fixed; z-index:200; background:var(--card); border:1px solid var(--border); border-radius:3px; padding:10px 14px; max-width:min(560px, calc(100vw - 24px)) }
+#legend-pop[hidden] { display:none }
+#legend-pop .legend { padding:0 }
 .dq-chip { font:inherit; font-size:12px; font-weight:600; color:var(--amber, #b45309); background:transparent;
   border:1px solid currentColor; border-radius:3px; padding:1px 8px; cursor:pointer }
 .dq-chip:hover { background:var(--bg) }
@@ -698,10 +708,16 @@ body.has-sandbox-banner header { margin-top:44px }
     <button class="icon-btn icon-only" id="redo-btn" title="Redo (Ctrl+Shift+Z)" aria-label="Redo" disabled></button>
     <button class="icon-btn icon-only" id="help-btn" title="Keyboard shortcuts (?)" aria-label="Help"></button>
     <button class="icon-btn icon-only" id="theme-toggle" aria-label="Switch theme"></button>
+    <button class="icon-btn has-label" id="key-btn" aria-haspopup="dialog" title="Swimlane colors and item shapes"><span class="btn-label">Key</span></button>
     <button class="icon-btn has-label" id="status-btn" aria-label="Status update" title="Build a status update prompt"><span class="btn-label">Status update</span></button>
     <button class="icon-btn has-label" id="settings-btn" aria-label="Settings"><span class="btn-label">Settings</span></button>
+    <button class="icon-btn icon-only" id="more-btn" aria-label="More" aria-haspopup="menu" title="Help and theme">⋯</button>
   </div>
 </header>
+<div id="more-menu" class="context-menu" role="menu">
+  <button data-act="help" role="menuitem">Help and shortcuts</button>
+  <button data-act="theme" role="menuitem" id="more-theme">Dark theme</button>
+</div>
 
 <div id="sp-backdrop"></div>
 <aside id="settings-panel" aria-labelledby="sp-title">
@@ -880,7 +896,7 @@ body.has-sandbox-banner header { margin-top:44px }
         <label class="sp-check"><input type="checkbox" id="sp-today"> Today marker</label>
         <label class="sp-check"><input type="checkbox" id="sp-elapsed"> Elapsed time</label>
         <label class="sp-check"><input type="checkbox" id="sp-deps"> Dependency arrows</label>
-        <label class="sp-check"><input type="checkbox" id="sp-legend"> Legend</label>
+        <label class="sp-check"><input type="checkbox" id="sp-legend"> Key button</label>
         <label class="sp-check"><input type="checkbox" id="sp-grid"> Month grid</label>
         <label class="sp-check"><input type="checkbox" id="sp-qmajor"> Quarter emphasis</label>
         <label class="sp-check"><input type="checkbox" id="sp-bands"> Swimlane bands</label>
@@ -1005,7 +1021,7 @@ body.has-sandbox-banner header { margin-top:44px }
   </div>
 </aside>
 
-<div class="legend" id="legend"></div>
+<div id="legend-pop" hidden role="dialog" aria-label="Key"><div class="legend" id="legend"></div></div>
 
 <main>
   <div class="chart-card" id="view-timeline">
@@ -1945,9 +1961,9 @@ function labelText(o) {
 // ── layout ───────────────────────────────────────────────────────────────
 const DENSITY = {
   ultra:    { rowH:20, swPad:2, headerH:50, barH:10, iconR:5, fontItem:8,  fontLane:10 },
-  compact:  { rowH:28, swPad:4, headerH:58, barH:13, iconR:6, fontItem:10, fontLane:12 },
-  normal:   { rowH:34, swPad:6, headerH:62, barH:14, iconR:7, fontItem:11, fontLane:13 },
-  spacious: { rowH:44, swPad:8, headerH:70, barH:18, iconR:8, fontItem:12, fontLane:14 }
+  compact:  { rowH:34, swPad:6, headerH:58, barH:20, iconR:7, fontItem:12, fontLane:12 },   // v4.13: larger bars and labels
+  normal:   { rowH:40, swPad:8, headerH:62, barH:24, iconR:8, fontItem:13, fontLane:13 },
+  spacious: { rowH:48, swPad:10, headerH:70, barH:28, iconR:9, fontItem:14, fontLane:14 }
 };
 const LAYOUT = {
   // v4.1 — labelCol splits into colored tab + sub-swimlane label column.
@@ -1966,7 +1982,7 @@ const SETTINGS_DEFAULTS = {
   laneGap: null,            // v4.6: px between swimlanes; null = use the preset
   timelineWidth: 1600,      // v4.6: target chart width in px (1600 = auto behavior)
   fontFamily: 'system',     // v4.6: key of FONT_STACKS
-  rowPacking: 'auto',          // v4.10: 'one' item per row | 'compact' (items share a row when they do not overlap)
+  rowPacking: 'compact',          // v4.10: 'one' item per row | 'compact' (items share a row when they do not overlap)
                                // v4.12: 'auto' = compact once more than AUTO_COMPACT_AT items are shown
   pageLayout: 'centered',      // v4.9: 'centered' (max 1600px page chrome) | 'full'
   timescaleStyle: 'classic',   // v4.7: 'classic' | 'rounded' | 'pill'
@@ -2631,13 +2647,17 @@ function render() {
   const msRows = rows.filter(inStrip);
   const bands = computeRowBands(rows.filter(r => !inStrip(r)));
 
-  // width tuning — target ~1600px total; scale pxPerDay to fit
-  const chartW = Number(SETTINGS.timelineWidth) || 1600;
+  // width tuning — target ~1600px total; scale pxPerDay to fit.
+  // v4.13: Auto (1600) now fits the chart area of the window, so the whole range shows without sideways scrolling
+  const auto = (Number(SETTINGS.timelineWidth) || 1600) === 1600;
+  const card = document.getElementById('view-timeline');
+  const fitW = card && card.clientWidth ? card.clientWidth - parseFloat(getComputedStyle(card).paddingLeft) - parseFloat(getComputedStyle(card).paddingRight) - 2 : 0;
+  const chartW = auto ? (fitW >= 700 ? fitW : 1600) : Number(SETTINGS.timelineWidth);
   const targetTimelineWidth = chartW - LAYOUT.labelCol - LAYOUT.padX * 2;
   // v4.13: the 2.4 px/day floor keeps month labels readable. Long ranges drop the month row, so they can shrink to fit.
   const set = TIER_PRESETS[SETTINGS.timescaleTiers];
   const noMonths = set ? !set.includes('month') && !set.includes('week') : totalDays > 800;
-  LAYOUT.pxPerDay = chartW === 1600
+  LAYOUT.pxPerDay = auto
     ? Math.max(noMonths ? 0.6 : 2.4, Math.min(5.5, targetTimelineWidth / totalDays))
     : Math.max(0.8, Math.min(14, targetTimelineWidth / totalDays));
   const tlW = totalDays * LAYOUT.pxPerDay;
@@ -3374,10 +3394,43 @@ function renderTodayMarker(dateToX, yTop, yBottom, xMin, xMax) {
   };
 }
 
+let FIT_TIMER = null;
+window.addEventListener('resize', () => {
+  if ((Number(SETTINGS.timelineWidth) || 1600) !== 1600) return;
+  clearTimeout(FIT_TIMER); FIT_TIMER = setTimeout(() => render(), 150);
+});
+// v4.13: the key and the ⋯ menu open under their buttons and close on an outside click or Escape
+function openUnder(btn, el) {
+  el.hidden = false; el.classList.add('on');
+  const b = btn.getBoundingClientRect(), w = el.offsetWidth;
+  el.style.left = Math.max(12, Math.min(b.right - w, window.innerWidth - w - 12)) + 'px';
+  el.style.top = (b.bottom + 6) + 'px';
+  const close = () => { el.hidden = el.id === 'legend-pop'; el.classList.remove('on'); document.removeEventListener('mousedown', out, true); document.removeEventListener('keydown', esc, true); };
+  const out = ev => { if (!el.contains(ev.target) && !btn.contains(ev.target)) close(); };
+  const esc = ev => { if (ev.key === 'Escape') { close(); btn.focus(); } };
+  document.addEventListener('mousedown', out, true); document.addEventListener('keydown', esc, true);
+  return close;
+}
+document.getElementById('key-btn').addEventListener('click', ev => {
+  const pop = document.getElementById('legend-pop');
+  if (!pop.hidden) { pop.hidden = true; return; }
+  openUnder(ev.currentTarget, pop);
+});
+document.getElementById('more-btn').addEventListener('click', ev => {
+  const menu = document.getElementById('more-menu');
+  if (menu.classList.contains('on')) { menu.classList.remove('on'); return; }
+  document.getElementById('more-theme').textContent = document.documentElement.dataset.theme === 'dark' ? 'Light theme' : 'Dark theme';
+  const close = openUnder(ev.currentTarget, menu);
+  menu.onclick = e => {
+    const a = e.target.closest('[data-act]'); if (!a) return; close();
+    document.getElementById(a.dataset.act === 'help' ? 'help-btn' : 'theme-toggle').click();
+  };
+});
+
 function renderLegend() {
   const el = document.getElementById('legend');
-  if (!SETTINGS.showLegend) { el.innerHTML = ''; el.style.display = 'none'; return; }
-  el.style.display = '';
+  document.getElementById('key-btn').hidden = !SETTINGS.showLegend;   // v4.13: Settings > Legend shows or hides the Key button
+  if (!SETTINGS.showLegend) { el.innerHTML = ''; return; }
   const swItems = SWIMLANES.map(s => `<div class="item"><span class="sw" style="background:${s.hex}"></span>${escapeHtml(s.name)}</div>`).join('');
   const shapeItems = Object.entries(ITEM_TYPES).map(([k, v]) =>
     `<div class="item"><span class="shape" style="color:var(--muted)">${v.icon}</span>${escapeHtml(v.label)}</div>`
@@ -3498,7 +3551,7 @@ function syncSettingsUi() {
   const cw = Number(SETTINGS.timelineWidth) || 1600;
   document.getElementById('sp-width').value = cw;
   document.getElementById('sp-width-val').textContent = cw === 1600 ? 'Auto' : `${cw} px`;
-  [['sp-scale', 'timescaleStyle', 'classic'], ['sp-ms', 'milestonePlacement', 'mixed'], ['sp-lanelabel', 'laneLabelMode', 'wrap'], ['sp-pagelayout', 'pageLayout', 'centered'], ['sp-rowpack', 'rowPacking', 'auto']]
+  [['sp-scale', 'timescaleStyle', 'classic'], ['sp-ms', 'milestonePlacement', 'mixed'], ['sp-lanelabel', 'laneLabelMode', 'wrap'], ['sp-pagelayout', 'pageLayout', 'centered'], ['sp-rowpack', 'rowPacking', 'compact']]
     .forEach(([id, key, dflt]) => document.querySelectorAll('#' + id + ' button')
       .forEach(b => b.classList.toggle('on', b.dataset.v === (SETTINGS[key] || dflt))));
   updateMsNote();
