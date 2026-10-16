@@ -54,7 +54,7 @@ Core functionality works, but the project is still being polished for public rel
 4. To load your own data:
    - Click **Settings** > **Download template** to get the Excel template (a copy is also in [examples/](examples/))
    - Fill in your data. The template's Instructions sheet explains every column
-   - Drag-drop the file onto the app (or click **Load .xlsx**)
+   - Drag-drop the file onto the app (or click **Load file** in Settings). A CSV with the same headers works too
 
 ## Features
 

@@ -8,6 +8,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- CSV import: load a CSV with the template's headers, such as Lanetrace's own CSV export or Excel's CSV UTF-8, from Settings > Data & sync > Load file, the command palette, or by dropping it on the page. Commas, semicolons or tabs. With a sync folder linked, Lanetrace keeps an Excel copy of the loaded CSV
+- Column headers match without regard to capitals, in Excel and CSV files
 - "Needs attention" list: clicking the chip lists each flagged item with the reason, and clicking an item opens it. The Data view marks flagged rows with ⚠ in the Quick look column, with the reason on hover, and the marks update as you edit
 - Duration on bars (Settings > Timeline > Timescale > Duration): adds each task's or phase's length after its title, such as "Integration Testing · 6 wks". Off by default. Auto uses days under 2 weeks, weeks up to 16 weeks, then months; Days, Weeks and Months fix the unit. Calendar days, counting the start and end day
 - Timescale rows (Settings > Timeline > Timescale > Rows). Auto, the default, fits the date range: Month · Week up to about 3 months, Year · Quarter · Month up to about 2 years, Year · Quarter beyond that. You can also pick Year · Quarter · Month, Year · Quarter, Year · Month, Quarter · Month, Quarter · Month · Week or Month · Week. Labels shorten (January 2026, Jan, J) or drop out when space runs out. Grid lines follow the lowest row. Pill shows the lowest row
@@ -23,6 +25,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 - Two swimlanes could get the same automatic color, because a swimlane's color came from its name and the default palette listed one purple twice. Automatic colors now skip colors already in use, including ones you picked, and repeat only after all 7 are used. Swimlanes that did not collide keep their color
+- Text Row IDs such as ENG-004 loaded as "not a number" from Excel. They now stay as typed, as the template allows
 - Loading a spreadsheet kept edits made in Lanetrace earlier and reapplied them to any row with the same title and swimlane, silently overriding the new file. Lanetrace now says how many edits would apply and asks whether to keep them or use the file as it is. Ctrl+Z brings them back. Restoring from the sync folder keeps them without asking
 - Settings > Timeline > Milestones has three choices: In swimlanes (every milestone, event and decision stays in its swimlane, even with a Strip Row), As set per item (the default: only items with a Strip Row go above) and Above timeline. Before, "In swimlanes" could not bring down items with a Strip Row, so the toggle looked broken. A note under the choices counts items with a Strip Row and offers Clear Strip Rows. Saved timelines keep their look
 - In Ultra density the first row started 4px inside the timescale. The space under the timescale is now the same in every density, with room for the Today badge

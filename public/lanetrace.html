@@ -940,15 +940,15 @@ body.has-sandbox-banner header { margin-top:44px }
       <div class="sp-lbl">Data source</div>
       <div id="sp-source" style="font-size:12px;color:var(--muted)">Built-in sample (22 rows)</div>
       <div class="sp-row" style="gap:6px;flex-wrap:wrap">
-        <button class="sp-btn primary" id="sp-load-xlsx">Load .xlsx…</button>
+        <button class="sp-btn primary" id="sp-load-xlsx">Load file…</button>
         <button class="sp-btn" id="sp-download-template">Download template</button>
         <button class="sp-btn" id="sp-reset-data">Restore sample</button>
       </div>
       <div style="font-size:11px;color:var(--muted);line-height:1.4">
         Download the template, fill in your data in Excel, then load it.
-        The sheet must be named <b>TimelineExcel</b>. Or drop it anywhere on the page.
+        The sheet must be named <b>TimelineExcel</b>. A CSV with the same column headers works too. Or drop either file anywhere on the page.
       </div>
-      <input type="file" id="sp-file-input" accept=".xlsx" style="display:none">
+      <input type="file" id="sp-file-input" accept=".xlsx,.csv" style="display:none">
     </div>
 
     <div class="sp-section">
@@ -2604,7 +2604,7 @@ function render() {
   if (rows.length === 0) {
     const totalIn = mergedRows().length;
     const msg = totalIn === 0
-      ? 'No items yet. Press N to add one, drop an .xlsx, or use the settings panel.'
+      ? 'No items yet. Press N to add one, drop an Excel or CSV file, or use the settings panel.'
       : 'All items hidden. Turn a swimlane back on, clear the filter, or check the "Shown" column.';
     svgEl.setAttribute('viewBox', '0 0 800 200');
     svgEl.setAttribute('width', 800); svgEl.setAttribute('height', 200);
@@ -4599,11 +4599,49 @@ async function loadXlsx(file) {
   if (!files[sheetPath]) throw new Error('Sheet contents not found at ' + sheetPath);
   const rowArrays = parseSheet(files[sheetPath], sharedStrings);
   if (rowArrays.length < 2) throw new Error('Sheet has no data rows.');
-  // header → map column letter → internal name
+  return rowsFromTable(rowArrays);
+}
+
+// v4.13: CSV, as Lanetrace exports it or as Excel saves "CSV UTF-8". Same headers as the template.
+// Commas, semicolons or tabs, whichever the header row uses. Quoted fields may hold commas and line breaks.
+async function loadCsv(file) {
+  let text = await file.text();
+  if (text.charCodeAt(0) === 0xFEFF) text = text.slice(1);
+  let delim = null;
+  const sep = text.match(/^sep=(.)\r?\n/i);                  // Excel's own delimiter hint
+  if (sep) { delim = sep[1]; text = text.slice(sep[0].length); }
+  if (!delim) {
+    const first = text.split(/\r?\n/, 1)[0].replace(/"[^"]*"/g, '');
+    delim = [',', ';', '\t'].map(d => [d, first.split(d).length]).sort((a, b) => b[1] - a[1])[0][0];
+  }
+  const records = [];
+  let row = [], field = '', q = false;
+  for (let i = 0; i < text.length; i++) {
+    const c = text[i];
+    if (q) {
+      if (c === '"') { if (text[i + 1] === '"') { field += '"'; i++; } else q = false; }
+      else field += c;
+    } else if (c === '"' && field === '') q = true;
+    else if (c === delim) { row.push(field); field = ''; }
+    else if (c === '\n' || c === '\r') {
+      if (c === '\r' && text[i + 1] === '\n') i++;
+      row.push(field); records.push(row); row = []; field = '';
+    } else field += c;
+  }
+  if (field !== '' || row.length) { row.push(field); records.push(row); }
+  const table = records.filter(r => r.some(v => v.trim() !== '')).map(r => Object.fromEntries(r.map((v, i) => [i, v.trim() === '' ? null : v])));
+  if (table.length < 2) throw new Error('The CSV has no data rows.');
+  return rowsFromTable(table);
+}
+
+// Turns a header row plus data rows (objects keyed by column) into timeline rows, with load warnings
+function rowsFromTable(rowArrays) {
+  // header → map column key → internal name. v4.13: header text matches without regard to case.
   const header = rowArrays[0];
+  const byLower = Object.fromEntries(Object.entries(FRIENDLY_TO_INTERNAL).map(([k, v]) => [k.toLowerCase(), v]));
   const colMap = {};
   for (const [colLetter, friendlyName] of Object.entries(header)) {
-    const internal = FRIENDLY_TO_INTERNAL[String(friendlyName || '').trim()];
+    const internal = byLower[String(friendlyName || '').trim().toLowerCase()];
     if (internal) colMap[colLetter] = internal;
   }
   const warnings = [];
@@ -4613,7 +4651,7 @@ async function loadXlsx(file) {
   const missingReq = REQUIRED_INTERNAL.filter(v => !mapped.includes(v));
   if (missingReq.length) {
     const friendly = missingReq.map(v => `"${Object.keys(FRIENDLY_TO_INTERNAL).find(k => FRIENDLY_TO_INTERNAL[k] === v)}"`);
-    warnings.push(`Missing column${missingReq.length > 1 ? 's' : ''} ${friendly.join(', ')}. Headers must match the template exactly.`);
+    warnings.push(`Missing column${missingReq.length > 1 ? 's' : ''} ${friendly.join(', ')}. Headers must match the template; capitals do not matter.`);
   }
   // rows
   const out = [];
@@ -4627,7 +4665,10 @@ async function loadXlsx(file) {
       if (v == null || v === '') { obj[internal] = null; continue; }
       if (DATE_INTERNAL.has(internal) && typeof v === 'number') v = excelSerialToDate(v).toISOString().slice(0, 10);
       else if (BOOL_INTERNAL.has(internal)) v = isRowShown({ IsShown: v });
-      else if (NUM_INTERNAL.has(internal) && typeof v === 'string') v = parseFloat(v);
+      else if (NUM_INTERNAL.has(internal) && typeof v === 'string') {
+        const t = v.trim(), n = Number(t);
+        v = !isNaN(n) ? n : internal === 'RowID' ? t : parseFloat(t);   // v4.13: codes like ENG-004 stay as Row IDs
+      }
       obj[internal] = v;
     }
     if (obj.ItemType || obj.Title) out.push(obj);
@@ -4701,7 +4742,8 @@ async function confirmEditsForNewFile(rows, fileName) {
 
 async function handleFile(file, opts = {}) {
   try {
-    const { rows, warnings } = await loadXlsx(file);
+    const isCsv = /\.(csv|txt)$/i.test(file.name);
+    const { rows, warnings } = await (isCsv ? loadCsv(file) : loadXlsx(file));
     if (!rows.length) throw new Error(['No usable rows found.', ...warnings].join(' '));
     if (!opts.fromSyncFolder) await confirmEditsForNewFile(rows, file.name);
     DATA_ROWS = rows;
@@ -4712,7 +4754,8 @@ async function handleFile(file, opts = {}) {
     // cache a copy in the sync folder for auto-reload next session
     if (SYNC_DIR && !opts.fromSyncFolder) {
       try {
-        const buf = await file.arrayBuffer();
+        // the cache is always .xlsx, so a CSV is stored as the Excel template filled with its rows
+        const buf = isCsv ? generateXlsxTemplate({ rows: exportTable(rows).rows, extraColumns: [], creator: 'Lanetrace' }) : await file.arrayBuffer();
         const fh = await SYNC_DIR.getFileHandle(DATA_CACHE_FILE, { create: true });
         const s = await fh.createWritable();
         await s.write(buf); await s.close();
@@ -5222,13 +5265,14 @@ document.getElementById('sp-download-template').addEventListener('click', () => 
 // Every row is exported, hidden ones with Shown = No, so nothing is lost. Item Type is written only when it
 // was set, so blank types stay blank and keep their inference. The Excel file uses the template layout and
 // loads straight back into Lanetrace; CSV is for other tools.
-function exportTable() {
+function exportTable(source) {   // v4.13: source rows default to the merged set
   const fieldOf = h => FRIENDLY_TO_INTERNAL[h];
   const extra = CUSTOM_COLUMNS.map(c => ({ h: c.label, w: 18, kind: 'text', req: false, accepts: 'Text',
     what: 'Custom column added in the Data view.', ex: '', hint: 'Custom column added in the Data view.', field: c.field }));
   const cols = [...TEMPLATE_COLUMNS.map(c => ({ ...c, field: fieldOf(c.h) })), ...extra];
-  let nextId = Math.max(0, ...mergedRows().map(r => Number(r.RowID) || 0)) + 1;
-  const rows = mergedRows().map(r => cols.map(c => {
+  const src = source || mergedRows();
+  let nextId = Math.max(0, ...src.map(r => Number(r.RowID) || 0)) + 1;
+  const rows = src.map(r => cols.map(c => {
     const v = r[c.field];
     if (c.field === 'RowID') return v != null && v !== '' ? v : nextId++;
     if (c.field === 'IsShown') return isRowShown(r) ? '' : 'No';
@@ -5291,8 +5335,8 @@ window.addEventListener('dragover',  ev => ev.preventDefault());
 window.addEventListener('drop', ev => {
   ev.preventDefault(); dragCounter = 0; dz.classList.remove('on');
   const f = ev.dataTransfer.files[0];
-  if (f && f.name.toLowerCase().endsWith('.xlsx')) handleFile(f);
-  else toast('Please drop an .xlsx file', 'err');
+  if (f && /\.(xlsx|csv)$/i.test(f.name)) handleFile(f);
+  else toast('Please drop an Excel (.xlsx) or CSV file', 'err');
 });
 
 // ── file-system persistence (Tier 1 — overlay model) ─────────────────────
@@ -5910,7 +5954,7 @@ document.getElementById('sp-reset-edits').addEventListener('click', () => {
 let PAL = { open: false, results: [], cursor: 0 };
 const VERBS = [
   { label: '＋ Add item',             fn: () => openEditor(null) },
-  { label: '📂 Load .xlsx',           fn: () => document.getElementById('sp-file-input').click() },
+  { label: '📂 Load Excel or CSV file',           fn: () => document.getElementById('sp-file-input').click() },
   { label: '⚙  Open settings',       fn: () => openPanel() },
   { label: '☀ Toggle theme',          fn: () => { SETTINGS.theme = document.documentElement.dataset.theme === 'dark' ? 'light' : 'dark'; saveSettings(); applySettings(); render(); syncSettingsUi(); } },
   { label: '📋 Status update prompt', fn: () => openStatus() },

@@ -1,12 +1,16 @@
 # Lanetrace Data Format
 
-This document describes the Excel column schema for Lanetrace timeline data.
+This document describes the column schema for Lanetrace timeline data, loaded from Excel or CSV.
 
 ## Excel Requirements
 
 - The workbook must contain a sheet named **TimelineExcel**
-- Data should be in a table format with headers in the first row. Header names must match the template exactly; Lanetrace warns on load when a required column is missing or rows are skipped for having no title
+- Data should be in a table format with headers in the first row. Header names must match the template; capitals do not matter. Lanetrace warns on load when a required column is missing or rows are skipped for having no title
 - Download the template from Settings > Download template for a pre-formatted starting point
+
+## CSV
+
+A CSV file with the same headers loads the same way: Lanetrace's own Export to CSV, Excel's CSV UTF-8, or text from another tool. Commas, semicolons or tabs all work; Lanetrace uses whichever the header row has. Quote a value that contains the separator or a line break. Write dates as 2026-03-31 or 3/31/2026.
 
 ## Column Reference
 
