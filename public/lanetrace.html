@@ -2094,11 +2094,14 @@ function packLanes(packKey) {
 }
 
 // SETTINGS loads here, after THEME_PACKS exists, because loadSettings validates the saved pack name.
+const LS_SETTINGS_KEY = 'lanetrace-settings';   // v4.13: was 'ptl-settings', shared with older builds
 let SETTINGS = loadSettings();
 
 function loadSettings() {
   try {
-    const raw = localStorage.getItem('ptl-settings');
+    // v4.13: Lanetrace's own key. Settings saved under the old shared key move over once.
+    let raw = localStorage.getItem(LS_SETTINGS_KEY);
+    if (raw == null) { raw = localStorage.getItem('ptl-settings'); if (raw != null) try { localStorage.setItem(LS_SETTINGS_KEY, raw); } catch (_) {} }
     if (!raw) return structuredClone(SETTINGS_DEFAULTS);
     const parsed = JSON.parse(raw);
     // v4.13: before the three-way setting, 'rows' still sent items with a Strip Row above. Keep how saved timelines look.
@@ -2109,7 +2112,7 @@ function loadSettings() {
   } catch (_) { return structuredClone(SETTINGS_DEFAULTS); }
 }
 function saveSettings() {
-  try { localStorage.setItem('ptl-settings', JSON.stringify(SETTINGS)); } catch (_) {}
+  try { localStorage.setItem(LS_SETTINGS_KEY, JSON.stringify(SETTINGS)); } catch (_) {}
   fsWriteState();   // debounced, no-op if no folder linked
 }
 const clampN = (v, a, b) => Math.min(b, Math.max(a, v));
@@ -3667,7 +3670,7 @@ document.getElementById('sp-fit-width').addEventListener('click', () => {
 });
 // v4.9: remember which settings groups are open
 (function () {
-  const KEY = 'ptl-sp-open';
+  const KEY = 'lanetrace-sp-open';
   let saved = null;
   try { saved = JSON.parse(localStorage.getItem(KEY) || 'null'); } catch (e) {}
   document.querySelectorAll('#settings-panel details.sp-group').forEach(d => {
@@ -4762,6 +4765,10 @@ async function handleFile(file, opts = {}) {
       } catch (e) { console.warn('Data cache write failed:', e); }
     }
     fsWriteState();
+    if (FS_SUPPORTED && !SYNC_STATUS.linked) {
+      let seen = true; try { seen = localStorage.getItem('lanetrace-sync-tip') === '1'; localStorage.setItem('lanetrace-sync-tip', '1'); } catch (_) {}
+      if (!seen) setTimeout(() => toast('Tip: link a sync folder in Settings > Data & sync to keep your edits if browser data is cleared, or to use them on another computer.', '', 9000), 2500);
+    }
     if (warnings.length) toast(`Loaded ${rows.length} rows from ${file.name}. ${warnings.join(' ')}`, 'err', 8000);
     else toast(`Loaded ${rows.length} rows from ${file.name}`);
   } catch (e) {
@@ -5349,7 +5356,7 @@ let SYNC_STATUS = { linked:false, dirName:'', lastSaved:'', needsPermission:fals
 // tiny IDB kv store (stores the directory handle across sessions)
 function idbOpen() {
   return new Promise((resolve, reject) => {
-    const r = indexedDB.open('ptl-app', 1);
+    const r = indexedDB.open('lanetrace-app', 1);   // v4.13: was 'ptl-app', shared with older builds
     r.onupgradeneeded = () => r.result.createObjectStore('kv');
     r.onsuccess = () => resolve(r.result);
     r.onerror = () => reject(r.error);
@@ -5403,8 +5410,9 @@ function renderSyncUi() {
     acts.innerHTML = `<button class="sp-btn primary" id="btn-pick-folder">Choose folder…</button>`;
   } else if (SYNC_STATUS.needsPermission) {
     box.classList.add('pending'); box.classList.remove('linked');
-    box.querySelector('.text').textContent = `Linked (permission needed): ${SYNC_STATUS.dirName}`;
+    box.querySelector('.text').textContent = `Last used folder: ${SYNC_STATUS.dirName} · the browser needs your permission again`;
     acts.innerHTML = `<button class="sp-btn primary" id="btn-reconnect">Reconnect</button>
+                     <button class="sp-btn" id="btn-change">Choose a different folder</button>
                      <button class="sp-btn" id="btn-forget">Disconnect</button>`;
   } else {
     box.classList.add('linked'); box.classList.remove('pending');
@@ -5436,6 +5444,7 @@ async function fsBoot() {
       SYNC_STATUS.needsPermission = true;
       return;   // will show a Reconnect button
     }
+    if (!(await fsFolderExists(handle))) { await fsForgetMissing(handle.name); return; }
     await fsRestoreFromDisk();
   } catch (e) { console.warn('fsBoot failed:', e); }
 }
@@ -5487,10 +5496,24 @@ async function fsPickFolder() {
   }
 }
 
+// v4.13: true when the linked folder can still be read (it may have been moved, renamed or deleted)
+async function fsFolderExists(handle) {
+  try { for await (const _ of handle.keys()) break; return true; }
+  catch (e) { return !(e && (e.name === 'NotFoundError' || e.name === 'NotReadableError')); }
+}
+async function fsForgetMissing(name) {
+  SYNC_DIR = null;
+  SYNC_STATUS = { linked:false, dirName:'', lastSaved:'', needsPermission:false };
+  try { await idbDel('sync-dir'); } catch (_) {}
+  renderSyncUi();
+  toast(`The sync folder "${name}" can no longer be found, so it was unlinked. Choose a folder in Settings > Data & sync.`, 'err', 8000);
+}
+
 async function fsRequestPermission() {
   if (!SYNC_DIR) return;
   try {
     const perm = await SYNC_DIR.requestPermission({ mode: 'readwrite' });
+    if (perm === 'granted' && !(await fsFolderExists(SYNC_DIR))) { await fsForgetMissing(SYNC_DIR.name); return; }
     if (perm === 'granted') {
       SYNC_STATUS.needsPermission = false;
       await fsRestoreFromDisk();
@@ -5562,7 +5585,7 @@ function pushHistory() {
 function restoreSnapshot(json) {
   const snap = JSON.parse(json);
   HISTORY_KEYS.forEach(k => { SETTINGS[k] = snap[k]; });
-  try { localStorage.setItem('ptl-settings', JSON.stringify(SETTINGS)); } catch(_) {}
+  try { localStorage.setItem(LS_SETTINGS_KEY, JSON.stringify(SETTINGS)); } catch(_) {}
   fsWriteState();
   applySettings(); syncSettingsUi(); render();
 }
