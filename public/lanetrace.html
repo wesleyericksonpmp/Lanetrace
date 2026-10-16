@@ -1758,7 +1758,7 @@ function paintIcon(elId, name) {
 
 // ── config ───────────────────────────────────────────────────────────────
 // Default color palette for swimlanes. Users can override via settings.
-const DEFAULT_PALETTE = ['#0072CE','#0092BC','#743A83','#78BE20','#00417D','#F2A900','#D50032','#743A83'];
+const DEFAULT_PALETTE = ['#0072CE','#0092BC','#743A83','#78BE20','#00417D','#F2A900','#D50032'];   // v4.13: listed purple twice
 // Seed colors for common swimlane names (override-able via settings)
 const SEED_SWIMLANE_COLORS = {
   'Product':          '#0072CE',
@@ -2184,9 +2184,20 @@ function deriveSwimlanes(rows) {
   inData.forEach(n => { if (!finalOrder.includes(n)) finalOrder.push(n); });
   const packKey = THEME_PACKS[SETTINGS.themePack] ? SETTINGS.themePack : 'corporate-blue';
   const themed = THEME_PACKS[packKey].lanes;     // undefined for Corporate, which keeps the seed swimlane colors
+  // v4.13: without a theme pack's lane list, a name picks its color by hash; when that color is taken,
+  // step to the next unused one so two swimlanes never share a color until the palette runs out
+  const used = new Set(finalOrder.map(n => SETTINGS.swimlaneColors[n] || (!themed && SEED_SWIMLANE_COLORS[n])).filter(Boolean).map(c => c.toUpperCase()));
+  const autoColor = name => {
+    const start = DEFAULT_PALETTE.indexOf(paletteColorFor(name));
+    for (let k = 0; k < DEFAULT_PALETTE.length; k++) {
+      const c = DEFAULT_PALETTE[(start + k) % DEFAULT_PALETTE.length];
+      if (!used.has(c.toUpperCase())) { used.add(c.toUpperCase()); return c; }
+    }
+    return paletteColorFor(name);
+  };
   return finalOrder.map((name, i) => ({
     name,
-    hex: SETTINGS.swimlaneColors[name] || (themed ? themed[i % themed.length] : (SEED_SWIMLANE_COLORS[name] || paletteColorFor(name))),
+    hex: SETTINGS.swimlaneColors[name] || (themed ? themed[i % themed.length] : (SEED_SWIMLANE_COLORS[name] || autoColor(name))),
     hidden: !!SETTINGS.swimlaneHidden[name]
   }));
 }
