@@ -44,6 +44,17 @@ header .meta { color:var(--muted); font-size:12px }
 .dq-chip { font:inherit; font-size:12px; font-weight:600; color:var(--amber, #b45309); background:transparent;
   border:1px solid currentColor; border-radius:3px; padding:1px 8px; cursor:pointer }
 .dq-chip:hover { background:var(--bg) }
+/* v4.13: the list behind the "needs attention" chip, and the matching marker in the Data view */
+#issues-pop { position:fixed; z-index:210; background:var(--card); color:var(--text); border:1px solid var(--border); border-radius:3px;
+  width:min(440px, calc(100vw - 24px)); max-height:min(420px, 70vh); overflow:auto; padding:6px 0; font-size:13px }
+#issues-pop[hidden] { display:none }
+#issues-pop .hd { padding:6px 14px 8px; font-size:11px; font-weight:700; text-transform:uppercase; letter-spacing:.04em; color:var(--muted) }
+#issues-pop button.it { display:block; width:100%; text-align:left; border:0; background:none; color:inherit; font:inherit; padding:7px 14px; cursor:pointer; line-height:1.4 }
+#issues-pop button.it:hover, #issues-pop button.it:focus-visible { background:var(--bg); outline:none }
+#issues-pop button.it b { display:block; font-weight:600 }
+#issues-pop button.it span { color:var(--muted) }
+#issues-pop .ft { border-top:1px solid var(--border); margin-top:4px; padding:8px 14px 4px }
+.data-grid .row-warn { display:inline-flex; align-items:center; justify-content:center; width:22px; height:24px; color:var(--amber, #b45309); font-size:13px; cursor:help; vertical-align:middle }
 .controls { display:flex; gap:8px; align-items:center }
 .icon-btn { height:34px; padding:0 10px; border:1px solid var(--border); border-radius:3px;
             background:var(--card); color:var(--text); cursor:pointer; font:inherit;
@@ -2417,6 +2428,42 @@ function highlightChain(key) {
     arrows.forEach(el => { if (el.dataset.from === e.from && el.dataset.to === e.to) el.classList.add('on'); }); });
 }
 
+// v4.13: flagged items by key, for the Data view marker and the chip's list
+let ISSUE_MAP = new Map();
+function refreshIssueMap() {
+  ISSUE_MAP = new Map();
+  dataIssues(prepareRows()).forEach(i => {
+    const why = i.msg.slice(i.msg.indexOf(': ') + 2);
+    ISSUE_MAP.set(i.key, [...(ISSUE_MAP.get(i.key) || []), why]);
+  });
+  return ISSUE_MAP;
+}
+function showIssuesList(anchor) {
+  let pop = document.getElementById('issues-pop');
+  if (!pop) { pop = document.createElement('div'); pop.id = 'issues-pop'; pop.hidden = true; pop.setAttribute('role', 'dialog'); pop.setAttribute('aria-label', 'Items that need attention'); document.body.appendChild(pop); }
+  if (!pop.hidden) { pop.hidden = true; return; }
+  const issues = dataIssues(prepareRows());
+  pop.innerHTML = `<div class="hd">${issues.length} need${issues.length === 1 ? 's' : ''} attention</div>` +
+    issues.map((i, n) => { const c = i.msg.indexOf(': ');
+      return `<button type="button" class="it" data-n="${n}"><b>${escapeHtml(i.msg.slice(0, c))}</b><span>${escapeHtml(i.msg.slice(c + 2))}</span></button>`; }).join('') +
+    `<div class="ft"><button type="button" class="sp-link" data-act="data">Show in the Data view</button></div>`;
+  const b = anchor.getBoundingClientRect();
+  pop.hidden = false;
+  const w = pop.offsetWidth;
+  pop.style.left = Math.max(12, Math.min(b.left, window.innerWidth - w - 12)) + 'px';
+  pop.style.top = (b.bottom + 6) + 'px';
+  const close = () => { pop.hidden = true; document.removeEventListener('mousedown', outside, true); document.removeEventListener('keydown', esc, true); };
+  const outside = ev => { if (!pop.contains(ev.target) && ev.target !== anchor) close(); };
+  const esc = ev => { if (ev.key === 'Escape') { ev.stopPropagation(); close(); anchor.focus(); } };
+  document.addEventListener('mousedown', outside, true); document.addEventListener('keydown', esc, true);
+  pop.onclick = ev => {
+    const it = ev.target.closest('button.it'), act = ev.target.closest('[data-act]');
+    if (it) { close(); openEditor(issues[+it.dataset.n].key); }
+    else if (act) { close(); switchView('data'); }
+  };
+  pop.querySelector('button.it')?.focus();
+}
+
 // v4.10: header counts plus a data-quality chip for items that cannot be drawn or look wrong
 function dataIssues(rows) {
   const out = [];
@@ -2440,8 +2487,9 @@ function updateCounts(rows) {
   const b = document.createElement('button');
   b.type = 'button'; b.className = 'dq-chip';
   b.textContent = `⚠ ${issues.length} need${issues.length === 1 ? 's' : ''} attention`;
-  b.title = issues.slice(0, 12).map(i => i.msg).join('\n') + (issues.length > 12 ? `\n+${issues.length - 12} more` : '') + '\n\nClick to open the Data view.';
-  b.addEventListener('click', () => switchView('data'));
+  b.title = 'Show which items need attention';
+  b.setAttribute('aria-haspopup', 'dialog');
+  b.addEventListener('click', () => showIssuesList(b));
   el.appendChild(document.createTextNode(' · ')); el.appendChild(b);
 }
 
@@ -6015,7 +6063,15 @@ function patchGridRow({ rowKey, field }) {
   tpl.innerHTML = renderDataGridRow(row, getOrderedColumns());
   const fresh = tpl.firstElementChild;
   if (rowKey === SELECTED_ROW_KEY) fresh.classList.add('row-selected');
+  refreshIssueMap();
   tr.replaceWith(fresh);
+  document.querySelectorAll('#data-grid tbody tr[data-key]').forEach(t => {
+    const warn = ISSUE_MAP.get(t.dataset.key), cell = t.querySelector('td.col-actions'), el = cell && cell.querySelector('.row-warn');
+    if (!cell) return;
+    if (warn && !el) cell.insertAdjacentHTML('afterbegin', `<span class="row-warn" title="${escapeHtml(warn.join('\n'))}" aria-label="Needs attention: ${escapeHtml(warn.join('; '))}">\u26A0</span>`);
+    else if (!warn && el) el.remove();
+    else if (warn && el) el.title = warn.join('\n');
+  });
   if (filter) populateFilterDropdowns(all);   // a new swimlane or type must appear in the filter menus
   return true;
 }
@@ -6276,6 +6332,7 @@ function renderDataGrid() {
   const allRows = mergedRows();
   populateFilterDropdowns(allRows);
   const rows = applyGridFilters(allRows);
+  refreshIssueMap();
   tbody.innerHTML = rows.map(r => renderDataGridRow(r, cols)).join('');
   const total = allRows.length;
   const filtered = rows.length;
@@ -6300,7 +6357,9 @@ function renderDataGridRow(r, cols) {
   // v4.12: Quick look: open the item form, a notes indicator with a preview, and the row menu (insert, delete)
   const k = escapeHtml(r._rowKey), name = escapeHtml(r.Title || 'item');
   const notes = String(r.Notes || '').trim();
+  const warn = ISSUE_MAP.get(r._rowKey);
   const actions = `<td class="col-actions">` +
+    (warn ? `<span class="row-warn" title="${escapeHtml(warn.join('\n'))}" aria-label="Needs attention: ${escapeHtml(warn.join('; '))}">\u26A0</span>` : '') +
     `<button class="row-info" title="Open item" aria-label="Open ${name}" data-key="${k}">${iconSvg('square-pen')}</button>` +
     (notes ? `<span class="row-notes" title="${escapeHtml(mdToPlain(notes).slice(0, 300))}" aria-label="Has notes">${iconSvg('sticky-note')}</span>`
            : '<span class="row-notes empty" aria-hidden="true"></span>') +
