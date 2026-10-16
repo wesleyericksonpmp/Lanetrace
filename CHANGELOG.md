@@ -21,6 +21,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Notes toolbar: a text style list (Normal, Heading 1, 2, 3) that applies to the current line, then bold, italic, numbered list and bullet list. Headings and numbered lists were missing from the 4.12.0 toolbar. The link button is removed for now, because links in notes could not be clicked anywhere in the app
 
 ### Fixed
+- Loading a spreadsheet kept edits made in Lanetrace earlier and reapplied them to any row with the same title and swimlane, silently overriding the new file. Lanetrace now says how many edits would apply and asks whether to keep them or use the file as it is. Ctrl+Z brings them back. Restoring from the sync folder keeps them without asking
 - Settings > Timeline > Milestones has three choices: In swimlanes (every milestone, event and decision stays in its swimlane, even with a Strip Row), As set per item (the default: only items with a Strip Row go above) and Above timeline. Before, "In swimlanes" could not bring down items with a Strip Row, so the toggle looked broken. A note under the choices counts items with a Strip Row and offers Clear Strip Rows. Saved timelines keep their look
 - In Ultra density the first row started 4px inside the timescale. The space under the timescale is now the same in every density, with room for the Today badge
 - Labels set to Above or Below ran past the right edge of the chart when their item sat near it, such as "General Availability · Mar 15" at narrower widths. Centered labels now slide inward at both edges

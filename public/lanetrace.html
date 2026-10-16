@@ -390,6 +390,14 @@ body.has-sandbox-banner header { margin-top:44px }
 #modal-back { position:fixed; inset:0; background:rgba(16,24,40,.42); z-index:150; opacity:0;
   transition:opacity 160ms; pointer-events:none; display:flex; align-items:center; justify-content:center }
 #modal-back.on { opacity:1; pointer-events:auto }
+/* v4.13: two-choice dialog, for decisions an OK/Cancel box cannot label clearly */
+#choice-back { position:fixed; inset:0; background:rgba(16,24,40,.42); z-index:170; display:flex; align-items:center; justify-content:center }
+#choice-back[hidden] { display:none }
+#choice { background:var(--card); color:var(--text); border:1px solid var(--border); border-radius:3px; width:min(480px, calc(100vw - 32px)); padding:20px 22px }
+#choice h2 { font-size:15px; margin:0 0 10px }
+#choice .body { font-size:13px; line-height:1.5; color:var(--text) }
+#choice .body p { margin:0 0 8px }
+#choice .acts { display:flex; gap:8px; justify-content:flex-end; margin-top:16px; flex-wrap:wrap }
 #modal { background:var(--card); border:1px solid var(--border); border-radius:3px;
   width:min(560px, calc(100vw - 32px)); max-height:calc(100vh - 48px);
   box-shadow:none; display:flex; flex-direction:column; overflow:hidden;
@@ -4585,10 +4593,58 @@ async function loadXlsx(file) {
   return { rows: out, warnings };
 }
 
+// v4.13: ask a question with labeled answers. Resolves with the chosen value, or cancelValue on Escape.
+function askChoice(title, bodyHtml, choices, cancelValue) {
+  return new Promise(resolve => {
+    let back = document.getElementById('choice-back');
+    if (!back) {
+      back = document.createElement('div'); back.id = 'choice-back'; back.hidden = true;
+      back.innerHTML = '<div id="choice" role="dialog" aria-modal="true" aria-labelledby="choice-title"><h2 id="choice-title"></h2><div class="body"></div><div class="acts"></div></div>';
+      document.body.appendChild(back);
+    }
+    back.querySelector('h2').textContent = title;
+    back.querySelector('.body').innerHTML = bodyHtml;
+    const acts = back.querySelector('.acts');
+    acts.innerHTML = choices.map((c, i) => `<button type="button" class="sp-btn${c.primary ? ' primary' : ''}" data-i="${i}">${escapeHtml(c.label)}</button>`).join('');
+    const done = v => { back.hidden = true; document.removeEventListener('keydown', onKey, true); resolve(v); };
+    const onKey = ev => { if (ev.key === 'Escape') { ev.stopPropagation(); done(cancelValue); } };
+    acts.onclick = ev => { const b = ev.target.closest('button[data-i]'); if (b) done(choices[+b.dataset.i].value); };
+    document.addEventListener('keydown', onKey, true);
+    back.hidden = false;
+    (acts.querySelector('.primary') || acts.querySelector('button')).focus();
+  });
+}
+
+// v4.13: edits are matched to rows by title and swimlane. Before they ride along onto a newly loaded
+// file, say how many would apply and let the person start clean. Restores from the sync folder keep them.
+async function confirmEditsForNewFile(rows, fileName) {
+  assignRowKeys(rows);
+  const keys = new Set(rows.map(r => r._rowKey));
+  const edited = Object.keys(SETTINGS.dataOverlay || {});
+  const matched = edited.filter(k => keys.has(k)).length;
+  const orphaned = edited.length - matched;
+  const added = (SETTINGS.addedItems || []).length;
+  const deleted = (SETTINGS.deletedKeys || []).filter(k => keys.has(k)).length;
+  if (!matched && !added && !deleted) return;
+  const parts = [];
+  if (matched) parts.push(`<b>${matched}</b> change${matched === 1 ? '' : 's'} to items that are also in this file, matched by title and swimlane. They would replace what the file says.`);
+  if (added) parts.push(`<b>${added}</b> item${added === 1 ? '' : 's'} you added in Lanetrace.`);
+  if (deleted) parts.push(`<b>${deleted}</b> item${deleted === 1 ? '' : 's'} you deleted that ${deleted === 1 ? 'is' : 'are'} in this file again.`);
+  if (orphaned) parts.push(`${orphaned} older change${orphaned === 1 ? '' : 's'} for items no longer in the file.`);
+  const keep = await askChoice('Keep your earlier edits?',
+    `<p>You made edits in Lanetrace before loading <b>${escapeHtml(fileName)}</b>:</p><ul>${parts.map(x => `<li>${x}</li>`).join('')}</ul>` +
+    `<p>If this file is a newer version of your plan, use it as it is. Ctrl+Z brings the edits back.</p>`,
+    [{ label: 'Keep my edits', value: true }, { label: 'Use the file as it is', value: false, primary: true }], false);
+  if (keep) return;
+  SETTINGS.dataOverlay = {}; SETTINGS.addedItems = []; SETTINGS.deletedKeys = [];
+  pushHistory();
+}
+
 async function handleFile(file, opts = {}) {
   try {
     const { rows, warnings } = await loadXlsx(file);
     if (!rows.length) throw new Error(['No usable rows found.', ...warnings].join(' '));
+    if (!opts.fromSyncFolder) await confirmEditsForNewFile(rows, file.name);
     DATA_ROWS = rows;
     LOADED_FILE_NAME = file.name;
     applySettings();
