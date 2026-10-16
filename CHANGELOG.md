@@ -25,6 +25,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 - Two swimlanes could get the same automatic color, because a swimlane's color came from its name and the default palette listed one purple twice. Automatic colors now skip colors already in use, including ones you picked, and repeat only after all 7 are used. Swimlanes that did not collide keep their color
+- Milestones pinned to the same Strip Row overlapped until the labels could not be read. The Strip Row is now the lowest row an item uses: when another pinned label already sits there, the item moves up to the next row with room, and with all 6 rows full it keeps its marker and drops the label
 - Sync folder: Lanetrace showed a folder link left by an older Timeline Studio build ("timelinev2" in one report). Browsers give every HTML file opened from disk the same storage, and both used the same names. Lanetrace now uses its own names: settings and edits saved under the old name move over once, and the folder link does not carry over, so you choose the folder once
 - Sync folder: a linked folder that was moved or deleted stayed listed as linked. It is now unlinked on startup with a message. When the browser needs permission again, the status reads "Last used folder: … · the browser needs your permission again", with Reconnect, Choose a different folder and Disconnect
 - A one-time tip after the first file load suggests linking a sync folder

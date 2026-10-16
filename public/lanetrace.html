@@ -2803,7 +2803,15 @@ function planMilestoneStrip(items, dateToX, svgW) {
     p.cx = clampN(p.x, 4 + p.w / 2, svgW - 4 - p.w / 2);
     p.l = p.cx - p.w / 2; p.rt = p.cx + p.w / 2;
     const pin = parseInt(p.r.MilestoneTier, 10);
-    if (pin >= 1 && pin <= MAXT) { p.tier = pin - 1; p.pinned = true; claim(p.tier, p.l, p.rt); }
+    if (pin >= 1 && pin <= MAXT) {
+      // v4.13: the Strip Row is the lowest row the item uses. When another pinned label already sits there,
+      // it moves up to the next row with room instead of overlapping; with no room left it keeps only its marker.
+      let t = pin - 1;
+      while (t < MAXT && !fits(t, p.l, p.rt)) t++;
+      if (t < MAXT) claim(t, p.l, p.rt);
+      else { t = pin - 1; p.hideLabel = true; claim(t, p.cx, p.cx); }
+      p.tier = t; p.pinned = true;
+    }
   });
   placed.forEach(p => {
     if (p.pinned) return;
