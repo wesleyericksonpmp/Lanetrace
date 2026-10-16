@@ -5049,7 +5049,8 @@ function generateXlsxTemplate(opts = {}) {
     ['Dates', 'Use real Excel dates. Text dates work as 2026-03-31 or 3/31/2026. Day-first text such as 31/03/2026, impossible dates such as 2026-02-30, and words such as TBD are not drawn. Lanetrace lists them in its "needs attention" chip.'],
     ['% Complete', 'Whole numbers from 0 to 100. Cells formatted as Excel percentages (0.5 shown as 50%) also work when the whole column uses that format. Values above 100 count as 100.'],
     ['Shown', 'No, N, Off, Hidden, FALSE or 0 hides the row. Anything else, or blank, shows it.'],
-    ['Headers', 'Lanetrace matches columns by exact header text. A renamed header is ignored, and the load message names the missing required columns. Extra columns of your own are fine.'],
+    ['Headers', 'Lanetrace matches columns by header text; capitals do not matter. A renamed header is ignored, and the load message names the missing required columns. Extra columns of your own are fine.'],
+    ['CSV', 'A CSV file with these same headers loads the same way, for example a CSV UTF-8 saved from Excel. Commas, semicolons or tabs all work.'],
     ['Depends on', 'List the Row IDs of items that must finish before this one starts. Lanetrace flags an item that starts before a predecessor finishes, an ID that matches no row, and a chain that loops back on itself. It never moves your dates.'],
     ['Row ID', 'Edits you make inside Lanetrace stay attached to their rows across new versions of this file. Keep Row IDs, titles and swimlanes stable between versions.'],
     ['Colors', 'Swimlane colors come from the theme you pick in Lanetrace. Use Color Category only to call out a single item.']
