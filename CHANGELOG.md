@@ -23,6 +23,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - The legend row is now a Key button that opens the swimlane colors and item shapes. Settings > Timeline chrome > Key button shows or hides it
   - Larger bars and labels: Compact draws 20 px bars with 12 px labels (was 13 px and 10 px); Normal and Spacious grow to match
   - Rows are packed by default, so items share a row when they do not overlap. Saved timelines keep their row layout
+  - On phones the header actions wrap, and Status update and Settings show only their icons. The ⋯ menu moves keyboard focus to its first item
   - Auto width fits the window, so the whole date range shows without sideways scrolling, and refits when the window is resized
 - Today marker: the badge hangs from the bottom edge of the timescale with a notch at the exact date, in every density and timescale shape. Before, it drifted with density: over the month names in Ultra, inside the month row in Compact, half on and half off in Normal. The line is thin and solid and draws under the items, so it no longer strikes through labels
 - Item form: Bar style and Marker shape are button pickers with drawn previews, matching the Data view, instead of text lists. Auto shows the shape the item will get

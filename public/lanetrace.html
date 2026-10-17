@@ -521,6 +521,12 @@ body.has-sandbox-banner header { margin-top:44px }
   border-radius:3px; background:var(--bg); color:var(--text); font:inherit; outline:none }
 .header-filter:focus { border-color:var(--blue) }
 @media (max-width:720px) { .header-filter { display:none } }
+/* v4.13: on phones the header actions wrap and Status update and Settings show only their icons */
+@media (max-width:560px) {
+  header { padding:8px 12px }
+  header .controls { flex-wrap:wrap; gap:6px }
+  #status-btn .btn-label, #settings-btn .btn-label { display:none }
+}
 
 /* print stylesheet */
 @media print {
@@ -3421,6 +3427,7 @@ document.getElementById('more-btn').addEventListener('click', ev => {
   if (menu.classList.contains('on')) { menu.classList.remove('on'); return; }
   document.getElementById('more-theme').textContent = document.documentElement.dataset.theme === 'dark' ? 'Light theme' : 'Dark theme';
   const close = openUnder(ev.currentTarget, menu);
+  menu.querySelector('button').focus();   // keyboard users land on the first item
   menu.onclick = e => {
     const a = e.target.closest('[data-act]'); if (!a) return; close();
     document.getElementById(a.dataset.act === 'help' ? 'help-btn' : 'theme-toggle').click();
