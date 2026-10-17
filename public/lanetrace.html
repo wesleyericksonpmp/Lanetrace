@@ -43,7 +43,7 @@ header h1 { font-size:17px; font-weight:700; margin:0; white-space:nowrap }
 header .sub { color:var(--muted); font-size:12px; margin:0; white-space:nowrap }
 header .meta { color:var(--muted); font-size:12px; order:2; margin-right:auto }
 header .view-tabs { order:1 }
-header .controls { order:3 }
+header .controls { order:3; margin-left:auto }   /* stays right-aligned when the header wraps */
 /* the subtitle hint shows while hovering the title or editing; an empty subtitle takes no space otherwise */
 header .title:not(:hover) #tl-subtitle:empty:not(:focus) { display:none }
 header #tl-subtitle { margin:0 !important; font-size:13px }
