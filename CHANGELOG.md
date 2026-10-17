@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [4.13.0] - 2026-10-17
+
 ### Added
 - CSV import: load a CSV with the template's headers, such as Lanetrace's own CSV export or Excel's CSV UTF-8, from Settings > Data & sync > Load file, the command palette, or by dropping it on the page. Commas, semicolons or tabs. With a sync folder linked, Lanetrace keeps an Excel copy of the loaded CSV
 - Column headers match without regard to capitals, in Excel and CSV files
