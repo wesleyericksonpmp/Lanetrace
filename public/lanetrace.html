@@ -44,6 +44,9 @@ header .sub { color:var(--muted); font-size:12px; margin:0; white-space:nowrap }
 header .meta { color:var(--muted); font-size:12px; order:2; margin-right:auto }
 header .view-tabs { order:1 }
 header .controls { order:3; margin-left:auto }   /* stays right-aligned when the header wraps */
+/* the Filter box shrinks (220 to 120 px) before the header wraps to a second line */
+header .controls { flex:1 1 auto; justify-content:flex-end; min-width:0 }
+header .controls > :not(.header-filter) { flex-shrink:0 }
 /* the subtitle hint shows while hovering the title or editing; an empty subtitle takes no space otherwise */
 header .title:not(:hover) #tl-subtitle:empty:not(:focus) { display:none }
 header #tl-subtitle { margin:0 !important; font-size:13px }
@@ -517,7 +520,7 @@ body.has-sandbox-banner header { margin-top:44px }
 #tl .lane-toggle:focus-visible { outline:2px solid var(--blue); outline-offset:-2px }
 
 /* header filter + help */
-.header-filter { width:220px; height:34px; padding:0 12px; border:1px solid var(--border);
+.header-filter { flex:0 1 220px; width:0; min-width:120px; height:34px; padding:0 12px; border:1px solid var(--border);
   border-radius:3px; background:var(--bg); color:var(--text); font:inherit; outline:none }
 .header-filter:focus { border-color:var(--blue) }
 @media (max-width:720px) { .header-filter { display:none } }

@@ -7,6 +7,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+- The header stays on one line at 1440 px and wider. A long title wrapped it onto a second line (101 px tall); now the Filter box narrows, down to 120 px, before the header wraps
+
 ## [4.13.0] - 2026-10-17
 
 ### Added
