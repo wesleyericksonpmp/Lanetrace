@@ -4,7 +4,7 @@
 
 Turn an Excel sheet into a swimlane timeline for any project, program or portfolio, in one HTML file that runs in any browser with no install, login or server.
 
-![A Lanetrace timeline exported from the built-in sample data](assets/screenshots/timeline.png)
+![The Lanetrace timeline view with the built-in sample data](assets/screenshots/timeline.png)
 
 ## What It Does
 
@@ -20,17 +20,21 @@ Lanetrace turns Excel data into professional timeline visuals. Drop in a spreads
 
 ## Screenshots
 
-**The app in dark mode.** Swimlanes, sub-swimlanes, phases, tasks, milestones, events and decisions, with a Today marker.
+**Dark mode with dependency arrows.** Turn on arrows to see which items wait on others. Hover an item to highlight its chain.
 
-![The Lanetrace timeline view in dark mode](assets/screenshots/app-dark.png)
+![The Lanetrace timeline in dark mode with dependency arrows](assets/screenshots/app-dark.png)
 
 **The Data view.** Edit inline like a spreadsheet, or open any row in the item form. Export the whole set to Excel.
 
 ![The Data view grid with the sample data](assets/screenshots/data-view.png)
 
-**The item form.** Title, type, owner and swimlane first, then schedule, Markdown notes and appearance options.
+**The item form.** Title, type, owner and swimlane first, then schedule, dependencies, Markdown notes and appearance options.
 
 ![The item form open on an Engineering phase](assets/screenshots/item-form.png)
+
+**Status update.** Pick an audience and a look-ahead window, then copy a prompt for your approved AI assistant and the timeline image for your email.
+
+![The Status update dialog with a steering committee prompt](assets/screenshots/status-update.png)
 
 ## Why It Exists
 
