@@ -7,6 +7,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+- By swimlane view in the Data tab (Group > By swimlane in the toolbar). Rows sit under a header per swimlane, in timeline order, with the swimlane's color and item count. Each header has + Add item, which opens the item form with that swimlane filled in, and + Add swimlane sits at the end. Drag a row by its grip in Quick look onto another swimlane's rows or header to move it there; undo works as usual. Arrow keys follow the grouped order. The choice is saved with your settings
+
 ### Fixed
 - The header stays on one line at 1440 px and wider. A long title wrapped it onto a second line (101 px tall); now the Filter box narrows, down to 120 px, before the header wraps
 

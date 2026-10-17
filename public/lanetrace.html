@@ -198,6 +198,17 @@ svg { display:block; user-select:none }
 .data-grid .row-notes { display:inline-flex; align-items:center; justify-content:center; width:24px; height:24px; color:var(--muted); cursor:help; vertical-align:middle }
 .data-grid .row-notes svg { width:14px; height:14px; stroke:currentColor }
 .data-grid .row-notes.empty { cursor:default }
+/* v4.14: By swimlane grouping: a header row per swimlane, and a grip to drag rows between swimlanes */
+.data-grid tbody tr.grp-head td, .data-grid tbody tr.grp-head:hover td { background:var(--bg); padding:6px 10px; font-weight:600 }
+.data-grid .grp-swatch { display:inline-block; width:10px; height:10px; border-radius:2px; margin-right:8px; vertical-align:-1px }
+.data-grid .grp-count { color:var(--muted); font-weight:400; font-size:12px; margin-left:8px }
+.data-grid .grp-add, .data-grid .grp-add-lane { margin-left:12px; padding:2px 8px; border:0; border-radius:3px; background:transparent;
+  color:var(--blue); font:inherit; font-size:12px; font-weight:600; cursor:pointer }
+.data-grid .grp-add:hover, .data-grid .grp-add-lane:hover { background:rgba(0,114,206,.1) }
+.data-grid .grp-add-lane { margin-left:0 }
+.data-grid tbody tr.drop-on td, .data-grid tbody tr.grp-head.drop-on td { background:color-mix(in srgb, var(--blue) 12%, var(--card)) }
+.data-grid .row-grip { display:inline-flex; align-items:center; justify-content:center; width:16px; height:24px; color:var(--muted); cursor:grab; vertical-align:middle }
+.data-grid .row-grip svg { width:14px; height:14px; stroke:currentColor }
 .data-grid .cell-barstyle { display:inline-flex; align-items:center; gap:8px; padding:6px 10px; white-space:nowrap }
 .data-grid .cell-barstyle .barstyle-label.muted { color:var(--muted); font-style:italic }
 .data-grid tbody tr:hover td.col-actions { background:var(--band) }
@@ -1046,6 +1057,13 @@ body.has-sandbox-banner header { margin-top:44px }
       </div>
       <button class="sp-btn" id="grid-export-xlsx" type="button" title="Download every item as an Excel file you can load back in">Export to Excel</button>
       <div class="filter-group">
+        <label class="filter-label" for="grid-group">Group</label>
+        <select id="grid-group" class="filter-select">
+          <option value="">None</option>
+          <option value="swimlane">By swimlane</option>
+        </select>
+      </div>
+      <div class="filter-group">
         <label class="filter-label">Item Type</label>
         <select id="filter-itemtype" class="filter-select">
           <option value="">All</option>
@@ -1779,7 +1797,7 @@ const DATA = [
 // }
 
 // Inlined Lucide icons — { name: '<svg …>…</svg>' }. Used by iconSvg() below.
-const ICONS = {'clipboard-list': '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="8" height="4" x="8" y="2" rx="1" ry="1"/><path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"/><path d="M12 11h4"/><path d="M12 16h4"/><path d="M8 11h.01"/><path d="M8 16h.01"/></svg>', "plus": "<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\" > <path d=\"M5 12h14\" /> <path d=\"M12 5v14\" /> </svg>", "more-vertical": "<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\"><circle cx=\"12\" cy=\"12\" r=\"1\"/><circle cx=\"12\" cy=\"5\" r=\"1\"/><circle cx=\"12\" cy=\"19\" r=\"1\"/></svg>", "trash-2": "<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\" > <path d=\"M10 11v6\" /> <path d=\"M14 11v6\" /> <path d=\"M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6\" /> <path d=\"M3 6h18\" /> <path d=\"M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2\" /> </svg>", "circle-help": "<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\" > <circle cx=\"12\" cy=\"12\" r=\"10\" /> <path d=\"M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3\" /> <path d=\"M12 17h.01\" /> </svg>", "moon": "<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\" > <path d=\"M20.985 12.486a9 9 0 1 1-9.473-9.472c.405-.022.617.46.402.803a6 6 0 0 0 8.268 8.268c.344-.215.825-.004.803.401\" /> </svg>", "sun": "<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\" > <circle cx=\"12\" cy=\"12\" r=\"4\" /> <path d=\"M12 2v2\" /> <path d=\"M12 20v2\" /> <path d=\"m4.93 4.93 1.41 1.41\" /> <path d=\"m17.66 17.66 1.41 1.41\" /> <path d=\"M2 12h2\" /> <path d=\"M20 12h2\" /> <path d=\"m6.34 17.66-1.41 1.41\" /> <path d=\"m19.07 4.93-1.41 1.41\" /> </svg>", "settings-2": "<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\" > <path d=\"M14 17H5\" /> <path d=\"M19 7h-9\" /> <circle cx=\"17\" cy=\"17\" r=\"3\" /> <circle cx=\"7\" cy=\"7\" r=\"3\" /> </svg>", "x": "<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\" > <path d=\"M18 6 6 18\" /> <path d=\"m6 6 12 12\" /> </svg>", "undo-2": "<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\" > <path d=\"M9 14 4 9l5-5\" /> <path d=\"M4 9h10.5a5.5 5.5 0 0 1 5.5 5.5v0a5.5 5.5 0 0 1-5.5 5.5H11\" /> </svg>", "redo-2": "<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\" > <path d=\"m15 14 5-5-5-5\" /> <path d=\"M20 9H9.5A5.5 5.5 0 0 0 4 14.5v0A5.5 5.5 0 0 0 9.5 20H13\" /> </svg>", "info": "<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\" > <circle cx=\"12\" cy=\"12\" r=\"10\" /> <path d=\"M12 16v-4\" /> <path d=\"M12 8h.01\" /> </svg>", "square-pen": "<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\" > <path d=\"M12 3H5a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7\" /> <path d=\"M18.375 2.625a1 1 0 0 1 3 3l-9.013 9.014a2 2 0 0 1-.853.505l-2.873.84a.5.5 0 0 1-.62-.62l.84-2.873a2 2 0 0 1 .506-.852z\" /> </svg>", "sticky-note": "<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\" > <path d=\"M16 3H5a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V8Z\" /> <path d=\"M15 3v4a2 2 0 0 0 2 2h4\" /> </svg>"};
+const ICONS = {'clipboard-list': '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="8" height="4" x="8" y="2" rx="1" ry="1"/><path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"/><path d="M12 11h4"/><path d="M12 16h4"/><path d="M8 11h.01"/><path d="M8 16h.01"/></svg>', "plus": "<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\" > <path d=\"M5 12h14\" /> <path d=\"M12 5v14\" /> </svg>", "more-vertical": "<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\"><circle cx=\"12\" cy=\"12\" r=\"1\"/><circle cx=\"12\" cy=\"5\" r=\"1\"/><circle cx=\"12\" cy=\"19\" r=\"1\"/></svg>", "trash-2": "<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\" > <path d=\"M10 11v6\" /> <path d=\"M14 11v6\" /> <path d=\"M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6\" /> <path d=\"M3 6h18\" /> <path d=\"M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2\" /> </svg>", "circle-help": "<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\" > <circle cx=\"12\" cy=\"12\" r=\"10\" /> <path d=\"M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3\" /> <path d=\"M12 17h.01\" /> </svg>", "moon": "<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\" > <path d=\"M20.985 12.486a9 9 0 1 1-9.473-9.472c.405-.022.617.46.402.803a6 6 0 0 0 8.268 8.268c.344-.215.825-.004.803.401\" /> </svg>", "sun": "<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\" > <circle cx=\"12\" cy=\"12\" r=\"4\" /> <path d=\"M12 2v2\" /> <path d=\"M12 20v2\" /> <path d=\"m4.93 4.93 1.41 1.41\" /> <path d=\"m17.66 17.66 1.41 1.41\" /> <path d=\"M2 12h2\" /> <path d=\"M20 12h2\" /> <path d=\"m6.34 17.66-1.41 1.41\" /> <path d=\"m19.07 4.93-1.41 1.41\" /> </svg>", "settings-2": "<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\" > <path d=\"M14 17H5\" /> <path d=\"M19 7h-9\" /> <circle cx=\"17\" cy=\"17\" r=\"3\" /> <circle cx=\"7\" cy=\"7\" r=\"3\" /> </svg>", "x": "<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\" > <path d=\"M18 6 6 18\" /> <path d=\"m6 6 12 12\" /> </svg>", "undo-2": "<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\" > <path d=\"M9 14 4 9l5-5\" /> <path d=\"M4 9h10.5a5.5 5.5 0 0 1 5.5 5.5v0a5.5 5.5 0 0 1-5.5 5.5H11\" /> </svg>", "redo-2": "<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\" > <path d=\"m15 14 5-5-5-5\" /> <path d=\"M20 9H9.5A5.5 5.5 0 0 0 4 14.5v0A5.5 5.5 0 0 0 9.5 20H13\" /> </svg>", "info": "<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\" > <circle cx=\"12\" cy=\"12\" r=\"10\" /> <path d=\"M12 16v-4\" /> <path d=\"M12 8h.01\" /> </svg>", "square-pen": "<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\" > <path d=\"M12 3H5a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7\" /> <path d=\"M18.375 2.625a1 1 0 0 1 3 3l-9.013 9.014a2 2 0 0 1-.853.505l-2.873.84a.5.5 0 0 1-.62-.62l.84-2.873a2 2 0 0 1 .506-.852z\" /> </svg>", "sticky-note": "<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\" > <path d=\"M16 3H5a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V8Z\" /> <path d=\"M15 3v4a2 2 0 0 0 2 2h4\" /> </svg>", "grip-vertical": "<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\"><circle cx=\"9\" cy=\"12\" r=\"1\"/><circle cx=\"9\" cy=\"5\" r=\"1\"/><circle cx=\"9\" cy=\"19\" r=\"1\"/><circle cx=\"15\" cy=\"12\" r=\"1\"/><circle cx=\"15\" cy=\"5\" r=\"1\"/><circle cx=\"15\" cy=\"19\" r=\"1\"/></svg>"};
 function iconSvg(name) { return ICONS[name] || ''; }
 // Prepend a Lucide icon into an element by id, preserving any existing label children.
 function paintIcon(elId, name) {
@@ -2024,7 +2042,8 @@ const SETTINGS_DEFAULTS = {
   // v4.0 — user-editable header title and current view
   timelineTitle:    'Lanetrace',
   timelineSubtitle: '',
-  activeView:       'timeline'   // 'timeline' | 'data'
+  activeView:       'timeline',  // 'timeline' | 'data'
+  dataGroupBy:      ''           // v4.14: Data view grouping, '' | 'swimlane'
 };
 // v4.4: Theme packs (drop-in CSS variable sets)
 const THEME_PACKS = {
@@ -5419,11 +5438,12 @@ document.getElementById('sp-reset-data').addEventListener('click', () => {
 // drag-drop anywhere on the page
 const dz = document.getElementById('dropzone');
 let dragCounter = 0;
-window.addEventListener('dragenter', ev => { ev.preventDefault(); dragCounter++; dz.classList.add('on'); });
+window.addEventListener('dragenter', ev => { ev.preventDefault(); if (GRID_ROW_DRAG) return; dragCounter++; dz.classList.add('on'); });
 window.addEventListener('dragleave', ev => { dragCounter--; if (dragCounter <= 0) { dragCounter = 0; dz.classList.remove('on'); } });
 window.addEventListener('dragover',  ev => ev.preventDefault());
 window.addEventListener('drop', ev => {
   ev.preventDefault(); dragCounter = 0; dz.classList.remove('on');
+  if (GRID_ROW_DRAG) return;
   const f = ev.dataTransfer.files[0];
   if (f && /\.(xlsx|csv)$/i.test(f.name)) handleFile(f);
   else toast('Please drop an Excel (.xlsx) or CSV file', 'err');
@@ -6205,6 +6225,7 @@ const FILTER_OF_FIELD = { Swimlane: 'swimlane', ItemType: 'itemType', StartDate:
 function patchGridRow({ rowKey, field }) {
   const filter = FILTER_OF_FIELD[field];
   if (filter && GRID_FILTERS[filter]) return false;
+  if (field === 'Swimlane' && SETTINGS.dataGroupBy === 'swimlane') return false;   // the row moves to another group
   const tr = document.querySelector(`#data-grid tbody tr[data-key="${cssEscape(rowKey)}"]`);
   const all = tr ? mergedRows() : [];
   const row = all.find(r => r._rowKey === rowKey);
@@ -6364,6 +6385,7 @@ function gridChoicesFor(col) {
 
 // v4.2: Filter state for data view
 const GRID_FILTERS = { itemType: '', swimlane: '', shown: '' };
+let GRID_ROW_DRAG = false;   // v4.14: a grid row is being dragged, so the page's file drop zone stays out of it
 
 // v4.2: Column order state (array of field names; null = use default order)
 let GRID_COLUMN_ORDER = null;
@@ -6483,12 +6505,42 @@ function renderDataGrid() {
   populateFilterDropdowns(allRows);
   const rows = applyGridFilters(allRows);
   refreshIssueMap();
-  tbody.innerHTML = rows.map(r => renderDataGridRow(r, cols)).join('');
+  tbody.innerHTML = SETTINGS.dataGroupBy === 'swimlane'
+    ? renderGroupedRows(allRows, rows, cols)
+    : rows.map(r => renderDataGridRow(r, cols)).join('');
   const total = allRows.length;
   const filtered = rows.length;
   document.getElementById('grid-count').textContent = filtered === total
     ? `${total} row${total === 1 ? '' : 's'}`
     : `${filtered} of ${total} rows`;
+}
+
+// v4.14: By swimlane: swimlanes in timeline order, then any rows with no swimlane
+function gridLanes(allRows) {
+  const lanes = deriveSwimlanes(allRows);
+  if (allRows.some(r => !r.Swimlane)) lanes.push({ name: '', hex: 'transparent' });
+  return lanes;
+}
+// The grid's rows in the order shown, for keyboard moves
+function gridRows() {
+  const all = mergedRows(), rows = applyGridFilters(all);
+  if (SETTINGS.dataGroupBy !== 'swimlane') return rows;
+  return gridLanes(all).flatMap(l => rows.filter(r => (r.Swimlane || '') === l.name));
+}
+function renderGroupedRows(allRows, rows, cols) {
+  const span = cols.length + 1;
+  let html = '';
+  for (const lane of gridLanes(allRows)) {
+    if (GRID_FILTERS.swimlane && lane.name !== GRID_FILTERS.swimlane) continue;
+    const inLane = rows.filter(r => (r.Swimlane || '') === lane.name);
+    const n = escapeHtml(lane.name);
+    html += `<tr class="grp-head" data-lane="${n}"><td colspan="${span}">` +
+      `<span class="grp-swatch" style="background:${lane.hex}"></span>${lane.name ? n : 'No swimlane'}` +
+      `<span class="grp-count">${inLane.length}</span>` +
+      (lane.name ? `<button class="grp-add" type="button" data-lane="${n}">+ Add item</button>` : '') +
+      `</td></tr>` + inLane.map(r => renderDataGridRow(r, cols)).join('');
+  }
+  return html + `<tr class="grp-head"><td colspan="${span}"><button class="grp-add-lane" type="button">+ Add swimlane</button></td></tr>`;
 }
 
 function renderDataGridRow(r, cols) {
@@ -6509,6 +6561,7 @@ function renderDataGridRow(r, cols) {
   const notes = String(r.Notes || '').trim();
   const warn = ISSUE_MAP.get(r._rowKey);
   const actions = `<td class="col-actions">` +
+    (SETTINGS.dataGroupBy === 'swimlane' ? `<span class="row-grip" draggable="true" title="Drag to another swimlane">${iconSvg('grip-vertical')}</span>` : '') +
     (warn ? `<span class="row-warn" title="${escapeHtml(warn.join('\n'))}" aria-label="Needs attention: ${escapeHtml(warn.join('; '))}">\u26A0</span>` : '') +
     `<button class="row-info" title="Open item" aria-label="Open ${name}" data-key="${k}">${iconSvg('square-pen')}</button>` +
     (notes ? `<span class="row-notes" title="${escapeHtml(mdToPlain(notes).slice(0, 300))}" aria-label="Has notes">${iconSvg('sticky-note')}</span>`
@@ -6517,7 +6570,7 @@ function renderDataGridRow(r, cols) {
     `</td>`;
   const qi = cols.findIndex(c => c.field === 'Title') + 1;
   tds.splice(qi > 0 ? qi : 0, 0, actions);
-  return `<tr class="${cls.join(' ')}" data-key="${k}">${tds.join('')}</tr>`;
+  return `<tr class="${cls.join(' ')}" data-key="${k}" data-lane="${escapeHtml(r.Swimlane || '')}">${tds.join('')}</tr>`;
 }
 
 // Render an inline SVG milestone shape at ~20px, using the existing renderMilestoneIcon.
@@ -7215,7 +7268,7 @@ function applyCellEdit(rowKey, field, value) {
 function moveGridSelection(rowKey, field, direction) {
   const cols = getOrderedColumns();
   const colIdx = cols.findIndex(c => c.field === field);
-  const rows = applyGridFilters(mergedRows());
+  const rows = gridRows();
   const rowIdx = rows.findIndex(r => r._rowKey === rowKey);
   if (rowIdx < 0 || colIdx < 0) return;
   let nRow = rowIdx, nCol = colIdx;
@@ -7258,6 +7311,53 @@ function initGrid() {
   paintIcon('grid-add-row', 'plus');
   document.getElementById('grid-add-row').addEventListener('click', () =>
     openEditor(null, GRID_FILTERS.swimlane ? { Swimlane: GRID_FILTERS.swimlane } : {}));
+  // v4.14: By swimlane grouping
+  const groupSel = document.getElementById('grid-group');
+  groupSel.value = SETTINGS.dataGroupBy || '';
+  groupSel.addEventListener('change', () => { SETTINGS.dataGroupBy = groupSel.value; saveSettings(); renderDataGrid(); });
+  table.addEventListener('click', ev => {
+    const add = ev.target.closest('.grp-add');
+    if (add) openEditor(null, { Swimlane: add.dataset.lane });
+    else if (ev.target.closest('.grp-add-lane')) openLaneModal();
+  });
+  // drag a row's grip onto another swimlane's rows or header to move it there
+  const tbody = table.querySelector('tbody');
+  let dragKey = null, overLane = null;
+  const markLane = lane => {
+    if (lane === overLane) return;
+    overLane = lane;
+    tbody.querySelectorAll('tr.drop-on').forEach(t => t.classList.remove('drop-on'));
+    if (lane) tbody.querySelectorAll(`tr[data-lane="${cssEscape(lane)}"]`).forEach(t => t.classList.add('drop-on'));
+  };
+  const endDrag = () => { markLane(null); dragKey = null; GRID_ROW_DRAG = false; };
+  tbody.addEventListener('dragstart', ev => {
+    const grip = ev.target.closest('.row-grip');
+    if (!grip) return;
+    const tr = grip.closest('tr');
+    dragKey = tr.dataset.key; GRID_ROW_DRAG = true;
+    ev.dataTransfer.effectAllowed = 'move';
+    ev.dataTransfer.setData('text/plain', dragKey);
+    ev.dataTransfer.setDragImage(tr, 20, 16);
+  });
+  tbody.addEventListener('dragover', ev => {
+    if (!dragKey) return;
+    const tr = ev.target.closest('tr[data-lane]');
+    const lane = tr ? tr.dataset.lane : '';
+    markLane(lane);
+    ev.preventDefault();
+    ev.dataTransfer.dropEffect = lane ? 'move' : 'none';
+  });
+  tbody.addEventListener('drop', ev => {
+    if (!dragKey) return;
+    ev.preventDefault(); ev.stopPropagation();
+    const key = dragKey, lane = overLane;
+    endDrag();
+    const row = mergedRows().find(r => r._rowKey === key);
+    if (!lane || !row || row.Swimlane === lane) return;
+    applyCellEdit(key, 'Swimlane', lane);
+    toast(`Moved “${row.Title || 'item'}” to ${lane}`);
+  });
+  tbody.addEventListener('dragend', endDrag);
   table.addEventListener('click', ev => {
     // row delete
     // boolean toggle
@@ -7582,7 +7682,7 @@ function moveGridSelectionFromCell(td, direction) {
   const field = td.dataset.field;
   const cols = getOrderedColumns();
   const colIdx = cols.findIndex(c => c.field === field);
-  const rows = applyGridFilters(mergedRows());
+  const rows = gridRows();
   const rowIdx = rows.findIndex(r => r._rowKey === rowKey);
   let nRow = rowIdx, nCol = colIdx;
   if (direction === 'left')  nCol = Math.max(0, colIdx - 1);
