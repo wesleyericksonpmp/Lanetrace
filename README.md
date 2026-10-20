@@ -114,7 +114,7 @@ See [docs/data-format.md](docs/data-format.md) for the complete column reference
 - Milestone/Task Title
 - End date
 
-**Optional columns** include Sub-swimlane, Start date (blank = milestone), % Complete, Owner, Depends on, Notes (Markdown), Item Type, Label Position, Milestone Shape, Bar Style, Milestone Row, Shown, Color Category and Title Color.
+**Optional columns** include Sub-swimlane, Start date (blank = milestone), % Complete, Owner, Depends on, Notes (Markdown), Item Type, Label Position, Milestone Shape, Bar Style, Milestone Row, Shown, Color Category, Title Color and Health.
 
 ## Privacy / Local-First
 

@@ -41,6 +41,7 @@ A CSV file with the same headers loads the same way: Lanetrace's own Export to C
 | Shown | IsShown | Boolean | TRUE | FALSE, No, N, 0, Off or Hidden (any case) hides the item. Anything else, or blank, shows it. |
 | Color Category | ColorCategory | Text | (blank) | Hex color override (e.g., #78BE20) |
 | Title Color | TitleColor | Text | Auto | Auto/White/Dark or a hex color for the item label |
+| Health | Health | Text | Auto | On Track/At Risk/Off Track (any case; Green, Amber, Yellow and Red also map). Blank is Auto: Lanetrace works it out from the dates and % complete (overdue = Off Track, behind pace = At Risk, otherwise On Track; complete items have none). Other text is kept as typed. An item marked On Track that is overdue shows in Needs attention, and At Risk or Off Track feeds the Status update rating |
 
 ## Item Type Inference
 

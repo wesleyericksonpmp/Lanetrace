@@ -500,6 +500,9 @@ body.has-sandbox-banner header { margin-top:44px }
 .f-fold .f-sum .warn { color:var(--red); font-weight:600 }
 .f-fold-body { display:flex; flex-direction:column; gap:12px; margin-top:12px }
 .field-row .fld-pct { flex:0 0 96px }
+.field-row .fld-health { flex:0 0 120px }
+/* v4.14: Health dot in the grid and the tooltip */
+.health-dot { display:inline-block; width:9px; height:9px; border-radius:50%; margin-right:6px; vertical-align:0 }
 .field-check .hint { font-weight:400; color:var(--muted); font-size:11px }
 
 /* command palette */
@@ -1173,6 +1176,12 @@ body.has-sandbox-banner header { margin-top:44px }
           <div class="field fld-pct">
             <label for="f-pct">% complete</label>
             <input id="f-pct" type="number" min="0" max="100" step="1" value="0">
+          </div>
+          <div class="field fld-health">
+            <label for="f-health">Health</label>
+            <select id="f-health" title="Auto works it out from the dates and % complete">
+              <option value="">Auto</option><option>On Track</option><option>At Risk</option><option>Off Track</option>
+            </select>
           </div>
         </div>
         <div class="field">
@@ -1892,6 +1901,34 @@ function renderMilestoneIcon(shapeKey, cx, cy, r, fill, stroke) {
 // Today marker follows the system date. A custom date (Settings) pins it for "as of" reporting.
 const localMidnight = d => new Date(d.getFullYear(), d.getMonth(), d.getDate());
 const isoLocal = d => `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
+// v4.14: Health is the owner's read on an item. Blank is Auto: Lanetrace works it out from the dates and % complete.
+const HEALTH_VALUES = ['On Track', 'At Risk', 'Off Track'];
+const HEALTH_COLORS = { 'On Track': 'var(--green)', 'At Risk': 'var(--amber)', 'Off Track': 'var(--red)' };
+const HEALTH_WORDS = { 'on track': 'On Track', green: 'On Track', 'at risk': 'At Risk', amber: 'At Risk', yellow: 'At Risk',
+                       'off track': 'Off Track', red: 'Off Track' };
+// Imported text matches without regard to capitals, and Green, Amber, Yellow and Red map across. Other text is kept as typed.
+function normHealth(v) {
+  const t = String(v ?? '').trim();
+  return t ? (HEALTH_WORDS[t.toLowerCase().replace(/[-_]+/g, ' ')] || t) : null;
+}
+// What Auto works out from the schedule status. Complete work has no health.
+function autoHealth(status) {
+  return status === 'Complete' ? '' : status === 'Overdue' ? 'Off Track'
+       : status === 'In progress, behind pace' ? 'At Risk' : 'On Track';
+}
+// For the tooltip: the set value, or the worked-out one marked "auto:". Rows without usable dates get none.
+function healthAttr(r) {
+  if (r._summary) return '';
+  if (r.Health) return r.Health;
+  const ok = d => d instanceof Date && !isNaN(d);
+  if (!((r._start && r._end) ? (ok(r._start) && ok(r._end)) : ok(r._at))) return '';
+  const a = autoHealth(scheduleStatus(r, getToday()).status);
+  return a ? 'auto:' + a : '';
+}
+function healthDot(h) {
+  return `<span class="health-dot" style="background:${HEALTH_COLORS[h] || 'var(--muted)'}"></span>`;
+}
+
 function getToday() {
   if (SETTINGS.todayMode === 'custom') {
     const d = parseDate(SETTINGS.todayCustom);
@@ -2525,6 +2562,14 @@ function dataIssues(rows) {
       else if (r._reversed)     out.push({ key: r._rowKey, msg: `${t}: end date is before the start date` });
     } else if (!r._at)          out.push({ key: r._rowKey, msg: `${t}: needs a date` });
   });
+  // v4.14: Health says On Track, but the schedule says the item is overdue
+  const today = getToday(), ok = d => d instanceof Date && !isNaN(d);
+  rows.forEach(r => {
+    if (r.Health !== 'On Track' || r._summary) return;
+    if (!((r._start && r._end) ? (ok(r._start) && ok(r._end)) : ok(r._at))) return;
+    const st = scheduleStatus(r, today);
+    if (st.status === 'Overdue') out.push({ key: r._rowKey, msg: `${r.Title || ('Row ' + r.RowID)}: Health is On Track, but it is overdue (${st.detail})` });
+  });
   return out.concat(dependencyChecks(rows).issues);
 }
 function updateCounts(rows) {
@@ -2895,7 +2940,7 @@ function renderMilestoneStrip(strip, yS) {
     LABEL_CTX[r._rowKey] = { shape: shapeKey, pos: 'Above', kind: 'card', fill };
     if (p.tier > 0) leaders.push(`<line x1="${p.x}" y1="${baseY}" x2="${p.x}" y2="${yS}" stroke="${fill}" stroke-width="1" opacity=".55" />`);
     const attrs = ` data-key="${escapeHtml(r._rowKey || '')}" data-title="${escapeHtml(r.Title || '')}"`
-      + ` data-owner="${escapeHtml(r.TaskOwner || '')}" data-notes="${escapeHtml(r.Notes || '')}"`
+      + ` data-owner="${escapeHtml(r.TaskOwner || '')}" data-notes="${escapeHtml(r.Notes || '')}" data-health="${escapeHtml(healthAttr(r))}"`
       + ` data-when="${escapeHtml(dateLabel(r))}" data-type="${escapeHtml(r.ItemType || '')}" data-pct="${r._pct}"`;
     let g = renderMilestoneIcon(shapeKey, p.x, iconCy, rr, fill);
     if (!p.hideLabel) {
@@ -3292,7 +3337,7 @@ function renderItem(r, cy, dateToX, sw) {
   const isHex = /^#(?:[0-9a-f]{3}|[0-9a-f]{6})$/i.test(rawColor);
   const itemFill = isHex ? rawColor : sw.hex;
   const dataAttrs = ` data-key="${escapeHtml(r._rowKey||'')}" data-title="${escapeHtml(r.Title||'')}"`
-    + ` data-owner="${escapeHtml(r.TaskOwner||'')}"`
+    + ` data-owner="${escapeHtml(r.TaskOwner||'')}" data-health="${escapeHtml(healthAttr(r))}"`
     + ` data-notes="${escapeHtml(r.Notes||'')}"`
     + ` data-when="${escapeHtml(dateLabel(r))}"`
     + ` data-type="${escapeHtml(r._summary ? 'Swimlane summary' : (r.ItemType || ''))}"`
@@ -3477,12 +3522,14 @@ function wireTooltips() {
     const type  = el.dataset.type;
     const owner = el.dataset.owner;
     const notes = el.dataset.notes;
+    const hv = el.dataset.health || '', auto = hv.startsWith('auto:'), health = auto ? hv.slice(5) : hv;
     const pct   = el.dataset.summaryLane ? 0 : (Number(el.dataset.pct) || 0);   // a summary title already states it
     tt.innerHTML = `
       <div class="tt-title">${escapeHtml(title)}</div>
       <div class="tt-meta">${escapeHtml(type)} · ${escapeHtml(when)}${pct ? ' · ' + pct + '%' : ''}</div>
       ${notes ? `<div class="tt-notes md">${renderMarkdown(notes)}</div>` : ''}
       ${owner ? `<div class="tt-owner">Owner: ${escapeHtml(owner)}</div>` : ''}
+      ${health ? `<div class="tt-owner">Health: ${healthDot(health)}${escapeHtml(health)}${auto ? ' (auto)' : ''}</div>` : ''}
       <div style="margin-top:6px;color:var(--blue);font-weight:600;font-size:11px">${el.dataset.summaryLane ? 'Click or press Enter to expand' : 'Click or press Enter to edit'}</div>
     `;
     const pad = 14;
@@ -4316,37 +4363,39 @@ const asLocalDay = d => (d.getUTCHours() === 0 && d.getUTCMinutes() === 0 && d.g
 
 let STATUS_SKIPPED = [];
 function statusItems(today) {
-  const dd = (a, b) => Math.round((a - b) / 86400000);
   const okDate = d => d instanceof Date && !isNaN(d);
   // Items without usable dates cannot be assessed. Skip them (and list them in the prompt) instead of failing.
   const all = prepareRows();
   const placed = all.filter(r => (r._start && r._end) ? (okDate(r._start) && okDate(r._end)) : okDate(r._at));
   STATUS_SKIPPED = all.filter(r => !placed.includes(r));
-  return placed.map(r => {
-    const isBar = !!(r._start && r._end);
-    const start = r._start ? asLocalDay(r._start) : null;
-    const date  = asLocalDay(isBar ? r._end : r._at);
-    const pct = r._pct || 0;
-    let status, detail = '', elapsed = 0;
-    if (isBar) {
-      if (pct >= 100) status = 'Complete';
-      else if (date < today) { status = 'Overdue'; detail = `${dd(today, date)} days past the end date`; }
-      else if (start > today) { status = 'Upcoming'; detail = `starts in ${dd(start, today)} days`; }
-      else {
-        status = 'In progress';
-        const span = Math.max(1, dd(date, start));
-        const exp = Math.round(Math.min(100, (dd(today, start) / span) * 100));
-        elapsed = exp;
-        detail = `${exp}% of the schedule has elapsed`;
-        if (pct + 20 < exp) status = 'In progress, behind pace';
-      }
-    } else {
-      if (pct >= 100) status = 'Complete';
-      else if (date < today) { status = 'Overdue'; detail = `date passed ${dd(today, date)} days ago and not marked complete`; }
-      else { status = 'Upcoming'; detail = dd(date, today) === 0 ? 'due today' : `due in ${dd(date, today)} days`; }
+  return placed.map(r => ({ r, ...scheduleStatus(r, today), type: r.ItemType || 'Item' }));
+}
+// The schedule status of one item with usable dates, from its dates and % complete
+function scheduleStatus(r, today) {
+  const dd = (a, b) => Math.round((a - b) / 86400000);
+  const isBar = !!(r._start && r._end);
+  const start = r._start ? asLocalDay(r._start) : null;
+  const date  = asLocalDay(isBar ? r._end : r._at);
+  const pct = r._pct || 0;
+  let status, detail = '', elapsed = 0;
+  if (isBar) {
+    if (pct >= 100) status = 'Complete';
+    else if (date < today) { status = 'Overdue'; detail = `${dd(today, date)} days past the end date`; }
+    else if (start > today) { status = 'Upcoming'; detail = `starts in ${dd(start, today)} days`; }
+    else {
+      status = 'In progress';
+      const span = Math.max(1, dd(date, start));
+      const exp = Math.round(Math.min(100, (dd(today, start) / span) * 100));
+      elapsed = exp;
+      detail = `${exp}% of the schedule has elapsed`;
+      if (pct + 20 < exp) status = 'In progress, behind pace';
     }
-    return { r, isBar, start, date, pct, status, detail, elapsed, type: r.ItemType || 'Item' };
-  });
+  } else {
+    if (pct >= 100) status = 'Complete';
+    else if (date < today) { status = 'Overdue'; detail = `date passed ${dd(today, date)} days ago and not marked complete`; }
+    else { status = 'Upcoming'; detail = dd(date, today) === 0 ? 'due today' : `due in ${dd(date, today)} days`; }
+  }
+  return { isBar, start, date, pct, status, detail, elapsed };
 }
 
 function buildStatusPrompt(o) {
@@ -4363,6 +4412,7 @@ function buildStatusPrompt(o) {
     const parts = [`${it.r.Title || '(untitled)'} [${it.type}]`, when];
     if (it.isBar || it.pct) parts.push(`${it.pct}% complete`);
     if (o.owners && it.r.TaskOwner) parts.push(`Owner: ${it.r.TaskOwner}`);
+    if (it.r.Health) parts.push(`Health: ${it.r.Health} (set by the owner)`);
     return parts.join(' | ');
   };
   const list = (arr, note) => arr.length
@@ -4372,6 +4422,9 @@ function buildStatusPrompt(o) {
   const overdue = items.filter(i => i.status === 'Overdue');
   const behind = items.filter(i => i.status === 'In progress, behind pace');
   const inprog = items.filter(i => i.status.startsWith('In progress'));
+  // v4.14: Health the owner set. It feeds the rating alongside the schedule rule.
+  const offTrack = items.filter(i => i.status !== 'Complete' && i.r.Health === 'Off Track');
+  const atRisk = items.filter(i => i.status !== 'Complete' && i.r.Health === 'At Risk');
   const done = items.filter(i => i.status === 'Complete' && within(i.date, back, today));
   // v4.12: "coming up" includes in-progress work due inside the window, not only work that starts in it
   const soonDate = i => (i.status === 'Upcoming' && i.isBar) ? i.start : i.date;
@@ -4388,12 +4441,15 @@ function buildStatusPrompt(o) {
   const keyOverdue = overdue.filter(i => i.type === 'Milestone' || i.type === 'Decision');
   const plural = (n, w) => `${n} ${w}${n === 1 ? '' : 's'}`;
   let rating, reason;
-  if (keyOverdue.length || behind.length >= 3) {
+  if (keyOverdue.length || behind.length >= 3 || offTrack.length) {
     rating = 'Red';
-    reason = keyOverdue.length ? `${plural(keyOverdue.length, 'milestone or decision')} overdue` : `${plural(behind.length, 'item')} behind pace`;
-  } else if (overdue.length || behind.length) {
+    reason = [keyOverdue.length && `${plural(keyOverdue.length, 'milestone or decision')} overdue`,
+              behind.length >= 3 && `${plural(behind.length, 'item')} behind pace`,
+              offTrack.length && `${plural(offTrack.length, 'item')} marked Off Track`].filter(Boolean).join(', ');
+  } else if (overdue.length || behind.length || atRisk.length) {
     rating = 'Yellow';
-    reason = [overdue.length && `${plural(overdue.length, 'item')} overdue`, behind.length && `${plural(behind.length, 'item')} behind pace`].filter(Boolean).join(', ');
+    reason = [overdue.length && `${plural(overdue.length, 'item')} overdue`, behind.length && `${plural(behind.length, 'item')} behind pace`,
+              atRisk.length && `${plural(atRisk.length, 'item')} marked At Risk`].filter(Boolean).join(', ');
   } else {
     rating = 'Green';
     reason = 'nothing is overdue or behind pace';
@@ -4407,6 +4463,7 @@ function buildStatusPrompt(o) {
     if (it.status.startsWith('In progress') && it.pct >= it.elapsed + 40) checks.push(`${t} reports ${it.pct}% complete with ${it.elapsed}% of its schedule elapsed.`);
     if (!it.isBar && it.pct > 0 && it.pct < 100) checks.push(`${t} is a ${it.type.toLowerCase()} marked ${it.pct}% complete; single-date items are usually 0 or 100.`);
     if (o.owners && it.status !== 'Complete' && !String(it.r.TaskOwner || '').trim()) checks.push(`${t} has no owner.`);
+    if (it.r.Health === 'On Track' && it.status === 'Overdue') checks.push(`${t} is marked On Track but is overdue (${it.detail}).`);
   });
   // v4.12: dependencies. Schedule conflicts go to DATA TO CONFIRM; late predecessors put open successors at risk.
   const byId = rowIdIndex(), byKey = new Map(items.map(i => [i.r._rowKey, i]));
@@ -4488,7 +4545,7 @@ ${A.sections.map((s, i) => `  ${i + 1}. ${s}`).join('\n')}
 - Plain text only, no tables or markdown, so it pastes cleanly into email. Simple hyphen bullets are fine. Do not describe or recreate the timeline; the timeline image goes below your text.
 
 ${STATUS_SKIPPED.length ? `NOTE: ${STATUS_SKIPPED.length} item(s) have no usable dates and are not assessed below: ${STATUS_SKIPPED.slice(0, 15).map(r => r.Title || '(untitled)').join('; ')}${STATUS_SKIPPED.length > 15 ? '; and more' : ''}. Mention that their dates are missing.\n\n` : ''}SUGGESTED RATING: ${rating} (${reason})
-Rule: Red if a milestone or decision is overdue, or 3 or more items are behind pace. Yellow if any item is overdue or behind pace. Otherwise Green.
+Rule: Red if a milestone or decision is overdue, 3 or more items are behind pace, or the owner marked an open item Off Track. Yellow if any item is overdue, behind pace, or marked At Risk. Otherwise Green.
 
 SIGNALS AS OF ${fmtMDY(today)}
 Items on timeline: ${items.length} | Complete: ${items.filter(i => i.status === 'Complete').length} | In progress: ${inprog.length} | Overdue: ${overdue.length} | Behind pace: ${behind.length}
@@ -4502,6 +4559,9 @@ ${list(overdue, i => i.detail)}
 
 IN PROGRESS BUT BEHIND PACE
 ${list(behind, i => i.detail)}
+
+MARKED AT RISK OR OFF TRACK BY THE OWNER
+${list([...offTrack, ...atRisk])}
 
 COMPLETED IN THE LAST ${o.back} DAYS
 ${list(done)}
@@ -4667,7 +4727,7 @@ const FRIENDLY_TO_INTERNAL = {
   'Owner':'TaskOwner','Depends on':'DependsOn','Notes':'Notes',
   'Item Type':'ItemType','Label Position':'LabelPosition','Title Color':'TitleColor',
   'Milestone Shape':'MilestoneShape','Bar Style':'BarStyle',
-  'Shown':'IsShown','Color Category':'ColorCategory','Milestone Row':'MilestoneTier'
+  'Shown':'IsShown','Color Category':'ColorCategory','Milestone Row':'MilestoneTier','Health':'Health'
 };
 
 function parseSheet(bytes, sharedStrings) {
@@ -4793,6 +4853,7 @@ function rowsFromTable(rowArrays) {
     if (typeof r.LabelPosition === 'string')
       r.LabelPosition = LABEL_POSITIONS.find(p => p.toLowerCase() === r.LabelPosition.trim().toLowerCase()) || r.LabelPosition;
     if (typeof r.MilestoneShape === 'string') r.MilestoneShape = r.MilestoneShape.trim().toLowerCase();
+    if (r.Health != null) r.Health = normHealth(r.Health);
   });
   return { rows: out, warnings };
 }
@@ -4944,7 +5005,12 @@ const TEMPLATE_COLUMNS = [
   { h: 'Title Color', w: 14, kind: 'text', req: false, accepts: 'Auto, White, Dark or a hex color',
     what: 'Auto picks white or dark text for contrast. Set it only to override.', ex: 'Auto',
     hint: 'Auto picks white or dark text for contrast. Choose White or Dark, or type a hex color, to override.',
-    list: ['Auto', 'White', 'Dark'], allowOther: true }
+    list: ['Auto', 'White', 'Dark'], allowOther: true },
+  { h: 'Health', w: 13, kind: 'text', req: false, accepts: 'On Track, At Risk, Off Track',
+    what: 'Your read on the item. Blank is Auto: Lanetrace works it out from the dates and % complete. Green, Amber and Red also work.', ex: 'At Risk',
+    hint: 'On Track, At Risk or Off Track. Leave blank for Auto, which Lanetrace works out from the dates and % complete.',
+    list: ['On Track', 'At Risk', 'Off Track'], allowOther: true,
+    otherMsg: 'Not one of the listed values. Lanetrace also reads Green, Amber, Yellow and Red, and keeps other text as typed.' }
 ];
 
 // opts.rows: arrays in column order (default: the sample program). opts.extraColumns: more columns after the
@@ -5024,10 +5090,10 @@ function generateXlsxTemplate(opts = {}) {
   const day = (mo, d) => new Date(y, m + mo, d);
   const monthEnd = mo => new Date(y, m + mo + 1, 0);
   const samples = opts.rows || [
-    // ID, Swimlane, Sub, Title, Start, End, %, Owner, Depends on, Notes, Type, Label, Shape, Bar, MsRow, Shown, Color, TitleColor
+    // ID, Swimlane, Sub, Title, Start, End, %, Owner, Depends on, Notes, Type, Label, Shape, Bar, MsRow, Shown, Color, TitleColor, Health
     [1, 'Product', '', 'Discovery and requirements', day(0, 1), monthEnd(1), 100, 'Product team', '', '**Scope:** customer interviews and a journey map', 'Phase'],
     [2, 'Product', '', 'Requirements sign-off', null, monthEnd(1), null, 'Sponsor', '', '', 'Milestone'],
-    [3, 'Engineering', 'Backend', 'API build', day(1, 1), monthEnd(4), 40, 'Backend team', '', 'Item Type left blank: Lanetrace reads the dates and draws a Phase.', ''],
+    [3, 'Engineering', 'Backend', 'API build', day(1, 1), monthEnd(4), 40, 'Backend team', '', 'Item Type left blank: Lanetrace reads the dates and draws a Phase.', '', '', '', '', '', '', '', '', 'At Risk'],
     [4, 'Engineering', 'Frontend', 'Portal UI', day(2, 1), monthEnd(4), 15, 'Frontend team', '2, 5', '', 'Task', 'Auto', '', 'Flat'],
     [5, 'Engineering', '', 'Architecture review', null, day(1, 15), null, 'Tech lead', '', 'Go or no-go on the hosting design', 'Decision'],
     [6, 'Marketing', '', 'Launch announcement', null, day(5, 10), null, 'Marketing', '', '', 'Event', 'Above'],
@@ -5055,7 +5121,7 @@ function generateXlsxTemplate(opts = {}) {
     const sq = `${colLetter(i)}2:${colLetter(i)}${RANGE_END}`;
     const hint = ` showInputMessage="1" promptTitle="${X(c.h.slice(0, 32))}" prompt="${X(c.hint.slice(0, 255))}"`;
     if (c.list) return `<dataValidation type="list" allowBlank="1"${c.allowOther ? ' errorStyle="information"' : ''} showErrorMessage="1"` +
-      ` errorTitle="${X(c.h)}" error="${X(c.allowOther ? 'Not one of the listed values. Lanetrace also accepts a hex color like #1A1F2B.' : 'Pick a value from the list.')}"${hint} sqref="${sq}">` +
+      ` errorTitle="${X(c.h)}" error="${X(c.allowOther ? (c.otherMsg || 'Not one of the listed values. Lanetrace also accepts a hex color like #1A1F2B.') : 'Pick a value from the list.')}"${hint} sqref="${sq}">` +
       `<formula1>"${X(c.list.join(','))}"</formula1></dataValidation>`;
     if (c.kind === 'date') return `<dataValidation type="date" operator="greaterThan" allowBlank="1" showErrorMessage="1"` +
       ` errorTitle="${X(c.h)}" error="Enter a date, like 2026-03-31. Text like TBD cannot be placed on the timeline."${hint} sqref="${sq}"><formula1>1</formula1></dataValidation>`;
@@ -5779,6 +5845,12 @@ function openEditor(key, defaults = {}) {
   document.getElementById('f-end').value     = isoDate(row?.EndDate);
   document.getElementById('f-at').value      = isoDate(row?.EndDate);
   document.getElementById('f-pct').value     = row?.PercentComplete ?? 0;
+  { // Health: an imported value outside the list gets its own option, so saving keeps it
+    const sel = document.getElementById('f-health'), h = String(row?.Health || '').trim();
+    sel.querySelectorAll('option[data-other]').forEach(o => o.remove());
+    if (h && !HEALTH_VALUES.includes(h)) { const o = new Option(h, h); o.dataset.other = '1'; sel.add(o); }
+    sel.value = h;
+  }
   document.getElementById('f-labelpos').value= row?.LabelPosition || 'Auto';
   { // Title color: named value, custom hex, or Auto
     const tc = String(row?.TitleColor || '').trim();
@@ -5837,6 +5909,7 @@ function readEditorForm() {
     StartDate:       startDate,
     EndDate:         endDate,
     PercentComplete: Number(document.getElementById('f-pct').value) || 0,
+    Health:          document.getElementById('f-health').value || null,
     LabelPosition:   document.getElementById('f-labelpos').value,
     TitleColor:      readTitleColorField(),
     MilestoneShape:  isPhaseOrTask ? null : (document.getElementById('f-shape').value || null),
@@ -6352,6 +6425,8 @@ const GRID_COLUMNS = [
   { field: 'StartDate',       label: 'Start',        width: 120, editor: 'date' },
   { field: 'EndDate',         label: 'End',          width: 120, editor: 'date' },
   { field: 'PercentComplete', label: '% Complete',   width: 90,  editor: 'number', min: 0, max: 100 },
+  { field: 'Health',          label: 'Health',       width: 110, editor: 'choice',
+    choices: ['', ...HEALTH_VALUES] },
   { field: 'TaskOwner',       label: 'Owner',        width: 220, editor: 'text' },
   { field: 'DependsOn',       label: 'Depends on',   width: 110, editor: 'text' },
   { field: 'Notes',           label: 'Notes',        width: 320, editor: 'text' },
@@ -6642,6 +6717,10 @@ function renderCellDisplay(r, col) {
     return `<div class="cell cell-barstyle" tabindex="0">${preview}<span class="${cls}">${escapeHtml(label)}</span></div>`;
   }
   const text = raw == null ? '' : String(raw);
+  if (col.field === 'Health') {   // v4.14: colored dot; blank reads Auto
+    return text ? `<div class="cell cell-health" tabindex="0">${healthDot(text)}${escapeHtml(text)}</div>`
+                : `<div class="cell cell-health" tabindex="0"><span class="muted">Auto</span></div>`;
+  }
   if (col.field === 'Notes' && text) {
     // v4.12: one line of plain text so rows keep an even height; the full note shows on hover and in the item form
     const plain = mdToPlain(text);
@@ -6713,7 +6792,9 @@ function openCellEditor(td) {
 
   let editor;
   if (col.editor === 'choice') {
-    const choices = gridChoicesFor(col);
+    const choices = gridChoicesFor(col).slice();
+    // A value outside the list (such as imported Health text) gets its own option, so leaving the cell keeps it
+    if (current != null && current !== '' && !choices.includes(String(current))) choices.push(String(current));
     editor = document.createElement('select');
     editor.className = 'cell-editor';
     choices.forEach(v => {
