@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [4.14.0] - 2026-10-20
+
 ### Added
 - By swimlane view in the Data tab (Group > By swimlane in the toolbar). Rows sit under a header per swimlane, in timeline order, with the swimlane's color and item count. Each header has + Add item, which opens the item form with that swimlane filled in, and + Add swimlane sits at the end. Drag a row by its grip in Quick look onto another swimlane's rows or header to move it there; undo works as usual. Arrow keys follow the grouped order. The choice is saved with your settings
 - Health field: On Track, At Risk or Off Track, or blank for Auto. Auto works it out from the dates and % complete: overdue reads Off Track, behind pace reads At Risk, anything else On Track. It has a column in the Data view (with a colored dot), a choice next to % complete in the item form, and a line in the tooltip, marked "(auto)" when worked out. Excel and CSV import and export carry it as a Health column, matched without regard to capitals, and Green, Amber, Yellow and Red map across; other text is kept as typed. An item marked On Track that is overdue shows in Needs attention. In the Status update, items marked At Risk or Off Track get their own list and feed the suggested rating (Off Track makes it Red, At Risk Yellow)
