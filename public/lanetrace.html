@@ -1053,6 +1053,7 @@ body.has-sandbox-banner header { margin-top:44px }
   <div class="data-card" id="view-data" hidden>
     <div class="data-toolbar">
       <button class="sp-btn primary" id="grid-add-row" type="button" title="Open the item form for a new item (N)"><span class="btn-label">New item</span></button>
+      <button class="sp-btn" id="grid-add-lane" type="button" title="Add a swimlane"><span class="btn-label">New swimlane</span></button>
       <div class="row-action-group">
         <button class="sp-btn" id="tb-insert-above" type="button" disabled title="Insert row above (Ctrl+Shift+Up)">↑ Insert</button>
         <button class="sp-btn" id="tb-insert-below" type="button" disabled title="Insert row below (Ctrl+Shift+Down)">↓ Insert</button>
@@ -7392,6 +7393,8 @@ function initGrid() {
   paintIcon('grid-add-row', 'plus');
   document.getElementById('grid-add-row').addEventListener('click', () =>
     openEditor(null, GRID_FILTERS.swimlane ? { Swimlane: GRID_FILTERS.swimlane } : {}));
+  paintIcon('grid-add-lane', 'plus');
+  document.getElementById('grid-add-lane').addEventListener('click', openLaneModal);
   // v4.14: By swimlane grouping
   const groupSel = document.getElementById('grid-group');
   groupSel.value = SETTINGS.dataGroupBy || '';
