@@ -148,6 +148,8 @@ svg { display:block; user-select:none }
 .data-grid tbody tr.new-row td { background:rgba(0,114,206,.05) }
 .data-grid .cell { display:block; padding:8px 10px; min-height:34px; line-height:18px;
                    outline:none; cursor:cell; white-space:pre-wrap; word-break:break-word }
+/* v4.16: long imported Row IDs (Planner's are 28 characters) stay on one line instead of stretching the row */
+.data-grid td.col-rowid .cell { white-space:nowrap; overflow:hidden; text-overflow:ellipsis; max-width:120px }
 .data-grid .cell.focused { box-shadow:inset 0 0 0 2px var(--blue) }
 .data-grid .cell.cell-notes { white-space:nowrap; overflow:hidden; text-overflow:ellipsis; max-width:320px }
 .data-grid .cell.editing { background:var(--bg); box-shadow:inset 0 0 0 2px var(--blue) }
@@ -426,6 +428,7 @@ body.has-sandbox-banner header { margin-top:44px }
 #choice .imap-preview th, #choice .imap-preview td { text-align:left; padding:4px 6px; border-bottom:1px solid var(--border); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; max-width:160px }
 #choice .imap-preview th { color:var(--muted); font-weight:600 }
 #choice .imap-miss { color:var(--red); margin:6px 0 0 }
+#choice .acts .sp-btn:disabled { opacity:.4; cursor:not-allowed; filter:none }
 #choice .imap-remember { display:flex; gap:6px; align-items:center; font-size:12px; margin-top:10px; color:var(--muted) }
 /* context menu (right-click on grid row) */
 .context-menu { position:fixed; background:var(--card); border:1px solid var(--border);
@@ -5180,10 +5183,16 @@ async function handleFile(file, opts = {}) {
         const field = 'Import_' + name;
         if (!CUSTOM_COLUMNS.some(c => c.field === field)) CUSTOM_COLUMNS.push({ field, label: name, width: 130, editor: 'text', custom: true });
       }
-      if (loaded.title && (!SETTINGS.timelineTitle || SETTINGS.timelineTitle === SETTINGS_DEFAULTS.timelineTitle)) {
-        SETTINGS.timelineTitle = loaded.title;
-        saveSettings();
-      }
+    }
+    // The plan or project name becomes the title, unless you typed your own. A title an earlier import set
+    // (and you left alone) is replaced, or cleared when this file has no name.
+    const cur = SETTINGS.timelineTitle || '';
+    const ownTitle = cur && cur !== SETTINGS_DEFAULTS.timelineTitle && cur !== SETTINGS.importedTitle;
+    if (!ownTitle && (loaded.title || SETTINGS.importedTitle)) {
+      const t = (loaded.title || '').slice(0, CHAR_LIMITS.timelineTitle);
+      SETTINGS.timelineTitle = t; SETTINGS.importedTitle = t || null;
+      saveSettings();
+      applyTitleFromSettings();
     }
     applySettings();
     syncSettingsUi();
@@ -7025,6 +7034,7 @@ function renderCellDisplay(r, col) {
     const plain = mdToPlain(text);
     return `<div class="cell cell-notes" tabindex="0" title="${escapeHtml(text)}">${escapeHtml(plain)}</div>`;
   }
+  if (col.field === 'RowID' && text.length > 12) return `<div class="cell" tabindex="0" title="${escapeHtml(text)}">${escapeHtml(text)}</div>`;
   return `<div class="cell" tabindex="0">${escapeHtml(text)}</div>`;
 }
 // Markdown Notes as a single line: drop markers, keep link text, join lines with a middle dot.
