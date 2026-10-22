@@ -108,8 +108,10 @@ svg { display:block; user-select:none }
             background:transparent; color:var(--muted); cursor:pointer; font:inherit;
             font-size:12px; font-weight:600; letter-spacing:.02em }
 .view-tab:hover { color:var(--text) }
-.view-tab[aria-selected="true"] { background:var(--card); color:var(--text);
+.view-tab[aria-selected="true"], .view-tab[aria-pressed="true"] { background:var(--card); color:var(--text);
                                   box-shadow:none}
+.data-toolbar .grid-layout { padding:2px }   /* v4.16: List | By swimlane, sized to the toolbar buttons */
+.data-toolbar .grid-layout .view-tab { height:28px }
 
 /* data view (v4.0 inline grid editor) */
 .data-card { background:var(--card); border:1px solid var(--border); border-radius:3px;
@@ -206,6 +208,8 @@ svg { display:block; user-select:none }
   color:var(--blue); font:inherit; font-size:12px; font-weight:600; cursor:pointer }
 .data-grid .grp-add:hover, .data-grid .grp-add-lane:hover { background:rgba(0,114,206,.1) }
 .data-grid .grp-add-lane { margin-left:0 }
+/* v4.16: a sub-swimlane's header sits inside its swimlane, indented and lighter */
+.data-grid tbody tr.grp-sub td, .data-grid tbody tr.grp-sub:hover td { background:var(--card); padding:4px 10px 4px 28px; font-weight:600; font-size:12px; color:var(--muted) }
 .data-grid tbody tr.drop-on td, .data-grid tbody tr.grp-head.drop-on td { background:color-mix(in srgb, var(--blue) 12%, var(--card)) }
 .data-grid .row-grip { display:inline-flex; align-items:center; justify-content:center; width:16px; height:24px; color:var(--muted); cursor:grab; vertical-align:middle }
 .data-grid .row-grip svg { width:14px; height:14px; stroke:currentColor }
@@ -1063,6 +1067,10 @@ body.has-sandbox-banner header { margin-top:44px }
   </div>
   <div class="data-card" id="view-data" hidden>
     <div class="data-toolbar">
+      <div class="view-tabs grid-layout" role="group" aria-label="Data view layout">
+        <button class="view-tab" type="button" data-group="" aria-pressed="true" title="Every item in one list">List</button>
+        <button class="view-tab" type="button" data-group="swimlane" aria-pressed="false" title="Items under a header per swimlane and sub-swimlane">By swimlane</button>
+      </div>
       <button class="sp-btn primary" id="grid-add-row" type="button" title="Open the item form for a new item (N)"><span class="btn-label">New item</span></button>
       <button class="sp-btn" id="grid-add-lane" type="button" title="Add a swimlane"><span class="btn-label">New swimlane</span></button>
       <div class="row-action-group">
@@ -1071,13 +1079,6 @@ body.has-sandbox-banner header { margin-top:44px }
         <button class="sp-btn" id="tb-delete-row" type="button" disabled title="Delete selected row (Delete)">Delete</button>
       </div>
       <button class="sp-btn" id="grid-export-xlsx" type="button" title="Download every item as an Excel file you can load back in">Export to Excel</button>
-      <div class="filter-group">
-        <label class="filter-label" for="grid-group">Group</label>
-        <select id="grid-group" class="filter-select">
-          <option value="">None</option>
-          <option value="swimlane">By swimlane</option>
-        </select>
-      </div>
       <div class="filter-group">
         <label class="filter-label">Item Type</label>
         <select id="filter-itemtype" class="filter-select">
@@ -6572,13 +6573,13 @@ const FILTER_OF_FIELD = { Swimlane: 'swimlane', ItemType: 'itemType', StartDate:
 function patchGridRow({ rowKey, field }) {
   const filter = FILTER_OF_FIELD[field];
   if (filter && GRID_FILTERS[filter]) return false;
-  if (field === 'Swimlane' && SETTINGS.dataGroupBy === 'swimlane') return false;   // the row moves to another group
+  if ((field === 'Swimlane' || field === 'SubSwimlane') && SETTINGS.dataGroupBy === 'swimlane') return false;   // the row moves to another group
   const tr = document.querySelector(`#data-grid tbody tr[data-key="${cssEscape(rowKey)}"]`);
   const all = tr ? mergedRows() : [];
   const row = all.find(r => r._rowKey === rowKey);
   if (!row) return false;
   const tpl = document.createElement('tbody');
-  tpl.innerHTML = renderDataGridRow(row, getOrderedColumns());
+  tpl.innerHTML = renderDataGridRow(row, visibleGridColumns());
   const fresh = tpl.firstElementChild;
   if (rowKey === SELECTED_ROW_KEY) fresh.classList.add('row-selected');
   refreshIssueMap();
@@ -6759,6 +6760,13 @@ function getOrderedColumns() {
   return ordered;
 }
 
+// v4.16: the columns the grid shows. By swimlane hides Swimlane and Sub-swimlane: the group headers say them.
+const groupedHides = new Set(['Swimlane', 'SubSwimlane']);
+function visibleGridColumns() {
+  const cols = getOrderedColumns();
+  return SETTINGS.dataGroupBy === 'swimlane' ? cols.filter(c => !groupedHides.has(c.field)) : cols;
+}
+
 function addCustomColumn(label) {
   const field = 'Custom_' + Date.now();
   const col = { field, label, width: 150, editor: 'text', custom: true };
@@ -6834,7 +6842,7 @@ function renderDataGrid() {
   if (!table) return;
   const thead = table.querySelector('thead');
   const tbody = table.querySelector('tbody');
-  const cols = getOrderedColumns();
+  const cols = visibleGridColumns();
   // header row — draggable for reordering, with delete button for custom columns
   thead.innerHTML = '<tr>' +
     cols.map(c => {
@@ -6870,30 +6878,47 @@ function gridLanes(allRows) {
   if (allRows.some(r => !r.Swimlane)) lanes.push({ name: '', hex: 'transparent' });
   return lanes;
 }
+// v4.16: each swimlane's rows: those with no sub-swimlane first, then each sub-swimlane in the order it first appears
+function laneGroups(allRows, rows) {
+  return gridLanes(allRows).map(lane => {
+    const inLane = r => (r.Swimlane || '') === lane.name;
+    const subs = [...new Set(allRows.filter(r => inLane(r) && r.SubSwimlane).map(r => String(r.SubSwimlane)))];
+    const shown = rows.filter(inLane);
+    return { lane, count: shown.length, direct: shown.filter(r => !r.SubSwimlane),
+             subs: subs.map(name => ({ name, rows: shown.filter(r => String(r.SubSwimlane) === name) })) };
+  });
+}
 // The grid's rows in the order shown, for keyboard moves
 function gridRows() {
   const all = mergedRows(), rows = applyGridFilters(all);
   if (SETTINGS.dataGroupBy !== 'swimlane') return rows;
-  return gridLanes(all).flatMap(l => rows.filter(r => (r.Swimlane || '') === l.name));
+  return laneGroups(all, rows).flatMap(g => [...g.direct, ...g.subs.flatMap(s => s.rows)]);
 }
 function renderGroupedRows(allRows, rows, cols) {
   const span = cols.length + 1;
   let html = '';
-  for (const lane of gridLanes(allRows)) {
+  for (const g of laneGroups(allRows, rows)) {
+    const { lane } = g;
     if (GRID_FILTERS.swimlane && lane.name !== GRID_FILTERS.swimlane) continue;
-    const inLane = rows.filter(r => (r.Swimlane || '') === lane.name);
     const n = escapeHtml(lane.name);
-    html += `<tr class="grp-head" data-lane="${n}"><td colspan="${span}">` +
+    html += `<tr class="grp-head" data-lane="${n}" data-sub=""><td colspan="${span}">` +
       `<span class="grp-swatch" style="background:${lane.hex}"></span>${lane.name ? n : 'No swimlane'}` +
-      `<span class="grp-count">${inLane.length}</span>` +
+      `<span class="grp-count">${g.count}</span>` +
       (lane.name ? `<button class="grp-add" type="button" data-lane="${n}">+ Add item</button>` : '') +
-      `</td></tr>` + inLane.map(r => renderDataGridRow(r, cols)).join('');
+      `</td></tr>` + g.direct.map(r => renderDataGridRow(r, cols)).join('');
+    for (const sub of g.subs) {
+      const s = escapeHtml(sub.name);
+      html += `<tr class="grp-head grp-sub" data-lane="${n}" data-sub="${s}"><td colspan="${span}">${s}` +
+        `<span class="grp-count">${sub.rows.length}</span>` +
+        `<button class="grp-add" type="button" data-lane="${n}" data-sub="${s}">+ Add item</button>` +
+        `</td></tr>` + sub.rows.map(r => renderDataGridRow(r, cols)).join('');
+    }
   }
   return html + `<tr class="grp-head"><td colspan="${span}"><button class="grp-add-lane" type="button">+ Add swimlane</button></td></tr>`;
 }
 
 function renderDataGridRow(r, cols) {
-  cols = cols || getOrderedColumns();
+  cols = cols || visibleGridColumns();
   const isNew = (SETTINGS.addedItems || []).some(a => a._rowKey === r._rowKey);
   const hidden = r.IsShown === false;
   const cls = [];
@@ -6919,7 +6944,7 @@ function renderDataGridRow(r, cols) {
     `</td>`;
   const qi = cols.findIndex(c => c.field === 'Title') + 1;
   tds.splice(qi > 0 ? qi : 0, 0, actions);
-  return `<tr class="${cls.join(' ')}" data-key="${k}" data-lane="${escapeHtml(r.Swimlane || '')}">${tds.join('')}</tr>`;
+  return `<tr class="${cls.join(' ')}" data-key="${k}" data-lane="${escapeHtml(r.Swimlane || '')}" data-sub="${escapeHtml(r.SubSwimlane || '')}">${tds.join('')}</tr>`;
 }
 
 // Render an inline SVG milestone shape at ~20px, using the existing renderMilestoneIcon.
@@ -7605,23 +7630,27 @@ function coerceValue(col, raw) {
 }
 
 function applyCellEdit(rowKey, field, value) {
+  applyRowEdit(rowKey, { [field]: value });
+  GRID_PATCH = { rowKey, field };
+  render();
+}
+// v4.16: several fields in one edit, so one undo reverts them all (moving a row to another sub-swimlane)
+function applyRowEdit(rowKey, patch) {
   const addedIdx = findAddedIndex(rowKey);
   if (addedIdx >= 0) {
-    SETTINGS.addedItems[addedIdx] = { ...SETTINGS.addedItems[addedIdx], [field]: value };
+    SETTINGS.addedItems[addedIdx] = { ...SETTINGS.addedItems[addedIdx], ...patch };
   } else {
     const overlay = SETTINGS.dataOverlay = SETTINGS.dataOverlay || {};
-    overlay[rowKey] = { ...(overlay[rowKey] || {}), [field]: value };
+    overlay[rowKey] = { ...(overlay[rowKey] || {}), ...patch };
   }
   pushHistory();  // Push AFTER changes
   saveSettings();
   applySettings();
   syncSettingsUi();
-  GRID_PATCH = { rowKey, field };
-  render();
 }
 
 function moveGridSelection(rowKey, field, direction) {
-  const cols = getOrderedColumns();
+  const cols = visibleGridColumns();
   const colIdx = cols.findIndex(c => c.field === field);
   const rows = gridRows();
   const rowIdx = rows.findIndex(r => r._rowKey === rowKey);
@@ -7669,22 +7698,27 @@ function initGrid() {
   paintIcon('grid-add-lane', 'plus');
   document.getElementById('grid-add-lane').addEventListener('click', openLaneModal);
   // v4.14: By swimlane grouping
-  const groupSel = document.getElementById('grid-group');
-  groupSel.value = SETTINGS.dataGroupBy || '';
-  groupSel.addEventListener('change', () => { SETTINGS.dataGroupBy = groupSel.value; saveSettings(); renderDataGrid(); });
+  // v4.16: List | By swimlane switch, in place of the Group dropdown
+  const layoutBtns = [...document.querySelectorAll('.grid-layout .view-tab')];
+  const syncLayout = () => layoutBtns.forEach(b => b.setAttribute('aria-pressed', String(b.dataset.group === (SETTINGS.dataGroupBy || ''))));
+  layoutBtns.forEach(b => b.addEventListener('click', () => {
+    if ((SETTINGS.dataGroupBy || '') === b.dataset.group) return;
+    SETTINGS.dataGroupBy = b.dataset.group; saveSettings(); syncLayout(); renderDataGrid();
+  }));
+  syncLayout();
   table.addEventListener('click', ev => {
     const add = ev.target.closest('.grp-add');
-    if (add) openEditor(null, { Swimlane: add.dataset.lane });
+    if (add) openEditor(null, add.dataset.sub ? { Swimlane: add.dataset.lane, SubSwimlane: add.dataset.sub } : { Swimlane: add.dataset.lane });
     else if (ev.target.closest('.grp-add-lane')) openLaneModal();
   });
-  // drag a row's grip onto another swimlane's rows or header to move it there
+  // drag a row's grip onto another swimlane's or sub-swimlane's rows or header to move it there
   const tbody = table.querySelector('tbody');
-  let dragKey = null, overLane = null;
-  const markLane = lane => {
-    if (lane === overLane) return;
-    overLane = lane;
+  let dragKey = null, overLane = null, overSub = '';
+  const markLane = (lane, sub = '') => {
+    if (lane === overLane && sub === overSub) return;
+    overLane = lane; overSub = sub;
     tbody.querySelectorAll('tr.drop-on').forEach(t => t.classList.remove('drop-on'));
-    if (lane) tbody.querySelectorAll(`tr[data-lane="${cssEscape(lane)}"]`).forEach(t => t.classList.add('drop-on'));
+    if (lane) tbody.querySelectorAll(`tr[data-lane="${cssEscape(lane)}"][data-sub="${cssEscape(sub)}"]`).forEach(t => t.classList.add('drop-on'));
   };
   const endDrag = () => { markLane(null); dragKey = null; GRID_ROW_DRAG = false; };
   tbody.addEventListener('dragstart', ev => {
@@ -7700,19 +7734,20 @@ function initGrid() {
     if (!dragKey) return;
     const tr = ev.target.closest('tr[data-lane]');
     const lane = tr ? tr.dataset.lane : '';
-    markLane(lane);
+    markLane(lane, tr ? tr.dataset.sub || '' : '');
     ev.preventDefault();
     ev.dataTransfer.dropEffect = lane ? 'move' : 'none';
   });
   tbody.addEventListener('drop', ev => {
     if (!dragKey) return;
     ev.preventDefault(); ev.stopPropagation();
-    const key = dragKey, lane = overLane;
+    const key = dragKey, lane = overLane, sub = overSub;
     endDrag();
     const row = mergedRows().find(r => r._rowKey === key);
-    if (!lane || !row || row.Swimlane === lane) return;
-    applyCellEdit(key, 'Swimlane', lane);
-    toast(`Moved “${row.Title || 'item'}” to ${lane}`);
+    if (!lane || !row || (row.Swimlane === lane && String(row.SubSwimlane || '') === sub)) return;
+    applyRowEdit(key, { Swimlane: lane, SubSwimlane: sub || null });
+    render();
+    toast(`Moved “${row.Title || 'item'}” to ${sub ? `${lane} / ${sub}` : lane}`);
   });
   tbody.addEventListener('dragend', endDrag);
   table.addEventListener('click', ev => {
@@ -8037,7 +8072,7 @@ function moveGridSelectionFromCell(td, direction) {
   if (!tr || !td.dataset.field) return;
   const rowKey = tr.dataset.key;
   const field = td.dataset.field;
-  const cols = getOrderedColumns();
+  const cols = visibleGridColumns();
   const colIdx = cols.findIndex(c => c.field === field);
   const rows = gridRows();
   const rowIdx = rows.findIndex(r => r._rowKey === rowKey);
