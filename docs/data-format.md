@@ -4,13 +4,26 @@ This document describes the column schema for Lanetrace timeline data, loaded fr
 
 ## Excel Requirements
 
-- The workbook must contain a sheet named **TimelineExcel**
-- Data should be in a table format with headers in the first row. Header names must match the template; capitals do not matter. Lanetrace warns on load when a required column is missing or rows are skipped for having no title
+- Lanetrace reads the sheet named **TimelineExcel**, as in the template. Without one, it reads Planner's Consolidated Data sheet, or else the first sheet
+- Data should be in a table format with headers in the first row. Template header names load directly; capitals do not matter. Lanetrace warns on load when a required column is missing or rows are skipped for having no title
 - Download the template from Settings > Download template for a pre-formatted starting point
 
 ## CSV
 
 A CSV file with the same headers loads the same way: Lanetrace's own Export to CSV, Excel's CSV UTF-8, or text from another tool. Commas, semicolons or tabs all work; Lanetrace uses whichever the header row has. Quote a value that contains the separator or a line break. Write dates as 2026-03-31 or 3/31/2026.
+
+## Planner, Smartsheet and other exports
+
+A file whose headers don't match the template is mapped onto it on load.
+
+- **Microsoft Planner:** use the plan's Export as Excel. Buckets become swimlanes and the plan name becomes the timeline title. Planner has no % complete, so Completed reads 100%, Not started 0%, and In progress the share of checklist items done, or 50% without a checklist. Checklist items are added to the notes.
+- **Smartsheet:** use Export to Excel. Indented rows become swimlanes (the first level under the project row) and sub-swimlanes (the next level). Parent rows act as grouping, unless their children have no dates. A Duration of 0 makes a milestone. Predecessors become Depends on, and links to parent rows are dropped. A Health column with Smartsheet's colored balls maps across, with Blue as Auto.
+- **Status, in either:** Complete sets 100%, Blocked makes Health Off Track, On Hold makes it At Risk, and Canceled rows are hidden.
+- **Rows with no dates** load hidden, so they are in the Data view but not on the timeline.
+- **Status, Priority, Labels and Goal** come in as Data view columns. They are not saved when the page reloads, and Export to Excel writes them as extra columns.
+- **Anything else** opens Match the columns: pick which column holds the title, the dates, the swimlane and the rest, with a preview. Lanetrace remembers the choice for files with the same columns, and Change mapping in the load message reopens it.
+
+Microsoft Project exports are not tested.
 
 ## Column Reference
 

@@ -7,6 +7,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+- Load Microsoft Planner and Smartsheet exports. Drop the .xlsx from Planner's Export as Excel or Smartsheet's Export to Excel, and Lanetrace maps it onto its own columns. Planner buckets become swimlanes and the plan name becomes the title. In a Smartsheet sheet, indented rows become swimlanes and sub-swimlanes, and parent rows act as grouping. Rows with no start date, or a Duration of 0, become milestones, and Smartsheet predecessors become dependencies. Status carries over: Complete sets 100%, Blocked makes Health Off Track, On Hold makes it At Risk, and Canceled rows are hidden. Rows with no dates load hidden in the Data view. Status, Priority, Labels and Goal come in as Data view columns. The load message says what was hidden or dropped
+- Match the columns: a spreadsheet or CSV whose headers don't match the template opens a dialog to choose which column holds the title, dates, swimlane and the rest, with a preview of the first rows. Swimlanes can come from a column, from the sheet's indent levels, or be a single lane. Lanetrace remembers the choice for files with the same columns, and Change mapping in the load message reopens the dialog
+
+### Fixed
+- Excel cells that hold text from a formula, which is how Planner writes its whole export, now read as text. They read as empty before
+- A workbook whose first sheet has the template's headers loads even when that sheet isn't named TimelineExcel
+
 ## [4.14.0] - 2026-10-20
 
 ### Added

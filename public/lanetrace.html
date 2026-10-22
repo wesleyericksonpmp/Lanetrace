@@ -412,6 +412,17 @@ body.has-sandbox-banner header { margin-top:44px }
   pointer-events:none; max-width:80vw }
 #toast.on { transform:translateX(-50%) translateY(0); opacity:1 }
 #toast.err { border-color:var(--red); color:var(--red) }
+#toast.has-action.on { pointer-events:auto }
+/* v4.16: the import mapping dialog, inside the choice dialog */
+#choice.imap { width:min(640px, calc(100vw - 32px)) }
+#choice .imap-grid { display:grid; grid-template-columns:1fr 1fr; gap:8px 16px; margin:10px 0 }
+#choice .imap-row { display:flex; flex-direction:column; gap:3px; font-size:12px; color:var(--muted) }
+#choice .imap-row select { font:inherit; font-size:13px; color:var(--text); background:var(--bg); border:1px solid var(--border); border-radius:3px; padding:5px 6px }
+#choice .imap-preview table { width:100%; border-collapse:collapse; font-size:12px; margin-top:4px }
+#choice .imap-preview th, #choice .imap-preview td { text-align:left; padding:4px 6px; border-bottom:1px solid var(--border); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; max-width:160px }
+#choice .imap-preview th { color:var(--muted); font-weight:600 }
+#choice .imap-miss { color:var(--red); margin:6px 0 0 }
+#choice .imap-remember { display:flex; gap:6px; align-items:center; font-size:12px; margin-top:10px; color:var(--muted) }
 /* context menu (right-click on grid row) */
 .context-menu { position:fixed; background:var(--card); border:1px solid var(--border);
   border-radius:3px; box-shadow:none; padding:4px 0; z-index:200;
@@ -4632,10 +4643,17 @@ document.getElementById('st-copy-image').addEventListener('click', () => documen
 
 // ── toast ────────────────────────────────────────────────────────────────
 let toastTimer = 0;
-function toast(msg, kind = 'ok', ms = 3000) {
+function toast(msg, kind = 'ok', ms = 3000, action = null) {
   const t = document.getElementById('toast');
   t.textContent = msg;
   t.classList.toggle('err', kind === 'err');
+  t.classList.toggle('has-action', !!action);   // v4.16: an optional button, such as "Change mapping"
+  if (action) {
+    const b = document.createElement('button');
+    b.type = 'button'; b.className = 'sp-link'; b.textContent = action.label;
+    b.onclick = () => { t.classList.remove('on'); action.run(); };
+    t.append(' ', b);
+  }
   t.classList.add('on');
   clearTimeout(toastTimer);
   toastTimer = setTimeout(() => t.classList.remove('on'), ms);
@@ -4744,6 +4762,7 @@ function parseSheet(bytes, sharedStrings) {
       let value;
       if (t === 's')      value = sharedStrings[parseInt(v, 10)];
       else if (t === 'b') value = v === '1';
+      else if (t === 'str') value = v ?? '';   // v4.16: text from a formula; Planner's export writes every cell this way
       else if (t === 'inlineStr') {
         const is = c.getElementsByTagName('is')[0];
         value = is ? [...is.getElementsByTagName('t')].map(t => t.textContent).join('') : '';
@@ -4751,25 +4770,262 @@ function parseSheet(bytes, sharedStrings) {
       else if (v !== undefined) value = parseFloat(v);
       cells[col] = value;
     }
+    // v4.16: Smartsheet keeps parent and child rows as Excel outline levels. Not enumerable, so it is never read as a column.
+    Object.defineProperty(cells, '_lvl', { value: parseInt(row.getAttribute('outlineLevel') || '0', 10) });
     rows.push(cells);
   }
   return rows;
 }
 
-async function loadXlsx(file) {
+// ── v4.16: import mapper ─────────────────────────────────────────────────
+// Files without the template's headers (Planner and Smartsheet exports, or any sheet with recognizable headers)
+// are mapped onto the template, then read by rowsFromTable like any template file.
+const IMPORT_FIELDS = [
+  { f: 'Title',           label: 'Title',        req: true, syn: ['task name', 'name', 'task', 'title', 'summary'] },
+  { f: 'EndDate',         label: 'End date',     req: true, syn: ['due date', 'end date', 'finish', 'finish date', 'due', 'end', 'deadline'] },
+  { f: 'StartDate',       label: 'Start date',   syn: ['start date', 'start', 'begin', 'begin date'] },
+  { f: 'Swimlane',        label: 'Swimlane',     syn: ['swimlane', 'bucket', 'phase', 'workstream', 'group', 'category', 'section', 'project'] },
+  { f: 'SubSwimlane',     label: 'Sub-swimlane', syn: ['sub-swimlane'] },
+  { f: 'PercentComplete', label: '% Complete',   syn: ['% complete', 'percent complete', 'progress', '% done'] },
+  { f: 'TaskOwner',       label: 'Owner',        syn: ['assigned to', 'owner', 'assignee'] },
+  { f: 'Notes',           label: 'Notes',        syn: ['notes', 'description', 'comments'] },
+  { f: 'RowID',           label: 'Row ID',       syn: ['row id', 'task id', 'id', 'unique id'] },
+  { f: 'DependsOn',       label: 'Depends on',   syn: ['predecessors', 'depends on', 'dependencies'] },
+  { f: 'Status',          label: 'Status',       syn: ['status', 'state'] },
+  { f: 'Health',          label: 'Health',       syn: ['health'] },
+  { f: 'Duration',        label: 'Duration',     syn: ['duration'] },
+  { f: 'Milestone',       label: 'Milestone',    syn: ['milestone'] },
+];
+const IMPORT_CUSTOM = ['Status', 'Priority', 'Labels', 'Goal'];   // kept as Data view columns when the file has them
+const LANE_OUTLINE = '__outline', LANE_ONE = '__one';
+let LAST_IMPORT_FILE = null;   // for "Change mapping"
+
+function workbookSheetNames(files) {
+  const wb = new DOMParser().parseFromString(new TextDecoder().decode(files['xl/workbook.xml']), 'application/xml');
+  return [...wb.getElementsByTagName('sheet')].map(s => s.getAttribute('name'));
+}
+const cellText = v => v == null ? '' : String(v).trim();
+const isTemplateHeader = header => {
+  const byLower = Object.fromEntries(Object.entries(FRIENDLY_TO_INTERNAL).map(([k, v]) => [k.toLowerCase(), v]));
+  const mapped = Object.values(header).map(h => byLower[cellText(h).toLowerCase()]).filter(Boolean);
+  return ['Title', 'EndDate', 'Swimlane'].every(f => mapped.includes(f));
+};
+
+// Read the file's columns and guess a mapping: { field: columnKey }. Lanes: a column key, LANE_OUTLINE or LANE_ONE.
+function guessImportMapping(cols, hierarchical) {
+  const m = {};
+  for (const fd of IMPORT_FIELDS) {
+    const hit = fd.syn.map(s => cols.find(c => c.lower === s)).find(Boolean);
+    if (hit && !Object.values(m).includes(hit.key)) m[fd.f] = hit.key;
+  }
+  if (!m.Swimlane) m.Swimlane = hierarchical ? LANE_OUTLINE : m.TaskOwner || null;
+  return m;
+}
+
+// The mapping dialog: one dropdown per field, a preview, and Load. Resolves to a mapping, or null when canceled.
+async function askImportMapping(cols, mapping, hierarchical, dataRows, fileName) {
+  const opt = (val, label, sel) => `<option value="${escapeHtml(val)}"${sel ? ' selected' : ''}>${escapeHtml(label)}</option>`;
+  const row = fd => {
+    const cur = mapping[fd.f] || '';
+    let opts = opt('', fd.req ? 'Choose a column' : '(none)', !cur);
+    if (fd.f === 'Swimlane') opts += (hierarchical ? opt(LANE_OUTLINE, 'Indent levels in the sheet', cur === LANE_OUTLINE) : '') + opt(LANE_ONE, 'One swimlane for everything', cur === LANE_ONE);
+    opts += cols.map(c => opt(c.key, c.name, cur === c.key)).join('');
+    return `<label class="imap-row"><span>${escapeHtml(fd.label)}${fd.req ? ' *' : ''}</span><select data-f="${fd.f}">${opts}</select></label>`;
+  };
+  const body = `<p>${escapeHtml(fileName)} doesn't use the Lanetrace template's headers. Choose which column holds each item, then Load. Title and End date are required.</p>
+    <div class="imap-grid">${IMPORT_FIELDS.filter(fd => !['Duration', 'Milestone'].includes(fd.f)).map(row).join('')}</div>
+    <div class="imap-preview"></div>
+    <label class="imap-remember"><input type="checkbox" checked> Remember this mapping for files with these columns</label>`;
+  const pending = askChoice('Match the columns', body, [{ label: 'Cancel', value: false }, { label: 'Load', value: true, primary: true }], false);
+  const dlg = document.getElementById('choice');
+  dlg.classList.add('imap');
+  const read = () => {
+    const m = { ...mapping };
+    dlg.querySelectorAll('select[data-f]').forEach(s => { m[s.dataset.f] = s.value || null; });
+    return m;
+  };
+  const preview = () => {
+    const m = read();
+    const show = ['Title', 'Swimlane', 'StartDate', 'EndDate'];
+    const head = show.map(f => `<th>${escapeHtml(IMPORT_FIELDS.find(x => x.f === f).label)}</th>`).join('');
+    const body = dataRows.slice(0, 5).map(r => '<tr>' + show.map(f => {
+      let v = m[f] === LANE_OUTLINE ? '(from indent)' : m[f] === LANE_ONE ? fileName.replace(/\.[^.]+$/, '') : m[f] ? r[m[f]] : '';
+      if (typeof v === 'number' && DATE_INTERNAL.has(f)) v = excelSerialToDate(v).toISOString().slice(0, 10);
+      return `<td>${escapeHtml(cellText(v))}</td>`;
+    }).join('') + '</tr>').join('');
+    const missing = IMPORT_FIELDS.filter(fd => fd.req && !m[fd.f]).map(fd => fd.label);
+    dlg.querySelector('.imap-preview').innerHTML = `<table><tr>${head}</tr>${body}</table>` +
+      (missing.length ? `<p class="imap-miss">Choose a column for ${missing.join(' and ')}.</p>` : '');
+    const load = dlg.querySelector('.acts .primary');
+    if (load) load.disabled = missing.length > 0;
+  };
+  dlg.addEventListener('change', preview);
+  preview();
+  const ok = await pending;
+  dlg.removeEventListener('change', preview);
+  const m = read(), remember = dlg.querySelector('.imap-remember input').checked;
+  dlg.classList.remove('imap');
+  return ok ? { mapping: m, remember } : null;
+}
+
+// Map a table (row 0 or a later row is the header) onto Lanetrace rows. ctx: { fileName, summary, planName, opts }
+async function importForeignTable(table, ctx) {
+  // the header is the first of the top 10 rows with at least 3 text cells
+  const hi = Math.max(0, table.slice(0, 10).findIndex(r => Object.values(r).filter(v => typeof v === 'string' && v.trim()).length >= 3));
+  const header = table[hi], data = table.slice(hi + 1).filter(r => Object.values(r).some(v => cellText(v) !== ''));
+  if (isTemplateHeader(header)) return rowsFromTable(table.slice(hi));
+  const cols = Object.entries(header).filter(([, v]) => cellText(v)).map(([key, v]) => ({ key, name: cellText(v), lower: cellText(v).toLowerCase() }));
+  const colBy = name => cols.find(c => c.lower === name)?.key;
+  const hierarchical = data.some(r => r._lvl > 0);
+  const sig = cols.map(c => c.lower).join('|');
+  const saved = (SETTINGS.importMappings || {})[sig];
+  let mapping = saved ? { ...saved } : guessImportMapping(cols, hierarchical);
+  const needsDialog = !mapping.Title || !mapping.EndDate || !mapping.Swimlane;
+  if (needsDialog || ctx.opts?.remap) {
+    const res = await askImportMapping(cols, mapping, hierarchical, data, ctx.fileName);
+    if (!res) throw new Error('Load canceled.');
+    mapping = res.mapping;
+    if (res.remember) { SETTINGS.importMappings = { ...(SETTINGS.importMappings || {}), [sig]: mapping }; saveSettings(); }
+  }
+  const get = (r, f) => get.key(f) ? r[get.key(f)] : undefined;
+  get.key = f => mapping[f] && mapping[f] !== LANE_OUTLINE && mapping[f] !== LANE_ONE ? mapping[f] : null;
+  const txt = (r, f) => cellText(get(r, f));
+  const notes = [];
+
+  // % Complete: fractions (0.32) become percents; files without a % column get it from Status (and Planner checklists)
+  const pctVals = data.map(r => get(r, 'PercentComplete')).map(v => typeof v === 'number' ? v : parseFloat(v)).filter(v => !isNaN(v));
+  const fraction = pctVals.some(v => v > 0) && pctVals.every(v => v <= 1);
+  const doneKey = colBy('completed checklist items');
+  const pctOf = r => {
+    const status = txt(r, 'Status').toLowerCase();
+    let p = parseFloat(get(r, 'PercentComplete'));
+    if (!isNaN(p)) p = Math.round(fraction ? p * 100 : p);
+    else if (status === 'in progress') {
+      const [a, b] = cellText(doneKey && r[doneKey]).split('/').map(Number);
+      p = b > 0 ? Math.round(a / b * 100) : 50;
+    } else p = status ? 0 : null;
+    return p;
+  };
+
+  // Lanes. From a column, from the sheet's indent levels, or one lane named after the file
+  const laneName = v => { const t = cellText(v); return /^[^@\s]+@[^@\s]+$/.test(t) ? t.split('@')[0].replace(/[._]+/g, ' ').replace(/\b\w/g, ch => ch.toUpperCase()) : t; };
+  const placed = data.map((r, i) => ({ r, i, lane: '', sub: '', type: '', skip: false }));
+  let title = cellText(ctx.planName);
+  if (mapping.Swimlane === LANE_OUTLINE) {
+    const lv = data.map(r => r._lvl || 0), n = data.length;
+    const kids = lv.map((l, i) => i + 1 < n && lv[i + 1] > l);
+    const datedBelow = lv.map((l, i) => { for (let j = i + 1; j < n && lv[j] > l; j++) if (cellText(get(data[j], 'EndDate'))) return true; return false; });
+    const roots = lv.map((l, i) => l === 0 && kids[i] ? i : -1).filter(i => i >= 0);
+    const base = roots.length === 1 ? 1 : 0;   // one project row on top: its children are the swimlanes
+    let lane = '', sub = '';
+    placed.forEach(p => {
+      const l = lv[p.i], dated = !!txt(p.r, 'EndDate');
+      if (base === 1 && l === 0) {
+        if (kids[p.i]) title = title || txt(p.r, 'Title');
+        else if (!dated) { p.skip = true; notes.push(`Skipped "${txt(p.r, 'Title')}", a top row with no dates.`); }
+        else p.lane = title || 'Items';
+        if (kids[p.i]) p.skip = true;
+        return;
+      }
+      if (l === base && kids[p.i]) { lane = txt(p.r, 'Title'); sub = ''; p.skip = true; return; }
+      if (l === base + 1 && kids[p.i]) {
+        sub = txt(p.r, 'Title');
+        // a parent's dates are usually rolled up from its children: it is an item only when it holds the only dates
+        if (!dated || datedBelow[p.i]) { p.skip = true; return; }
+        p.type = 'Phase';
+      }
+      if (l > base + 1 && kids[p.i]) { if (datedBelow[p.i]) { p.skip = true; return; } p.type = 'Phase'; }
+      p.lane = lane || title || 'Items';
+      p.sub = l > base + 1 || p.type === 'Phase' ? sub : '';   // rows directly under a swimlane have no sub-swimlane
+    });
+  } else if (mapping.Swimlane === LANE_ONE) {
+    const one = ctx.fileName.replace(/\.[^.]+$/, '');
+    placed.forEach(p => { p.lane = one; });
+  } else {
+    placed.forEach(p => { p.lane = laneName(get(p.r, 'Swimlane')) || '(No swimlane)'; p.sub = txt(p.r, 'SubSwimlane'); });
+  }
+  const items = placed.filter(p => !p.skip && txt(p.r, 'Title'));
+
+  // Row IDs: the file's own, else the row number, which Smartsheet predecessors refer to
+  items.forEach(p => { p.id = txt(p.r, 'RowID') || String(p.i + 1); });
+  const ids = new Set(items.map(p => p.id));
+  let droppedLinks = 0, hiddenUndated = 0, canceled = 0;
+  const forcedDone = [];
+  const friendly = ['Row ID', 'Swimlane', 'Sub-swimlane', 'Milestone/Task Title', 'Start date', 'End date', 'Owner', 'Depends on', 'Notes', 'Item Type', 'Shown', 'Health'];
+  const after = new Map();   // values set after rowsFromTable: % Complete and the custom columns
+  const customKeys = IMPORT_CUSTOM.map(name => ({ name, key: name === 'Status' ? get.key('Status') : colBy(name.toLowerCase()) })).filter(c => c.key);
+  const out = items.map(p => {
+    const r = p.r, status = txt(r, 'Status').toLowerCase();
+    const start = get(r, 'StartDate'), end = get(r, 'EndDate');
+    let type = p.type, startOut = start;
+    const dur = txt(r, 'Duration');
+    if (dur) { if (/^0\s*[a-z]*$/i.test(dur)) { type = 'Milestone'; startOut = null; } else type = type || 'Task'; }
+    const msFlag = /^(1|true|yes)$/i.test(txt(r, 'Milestone'));
+    if (msFlag && (!cellText(start) || cellText(start) === cellText(end))) { type = 'Milestone'; startOut = null; }
+    let health = txt(r, 'Health');
+    if (/^blue$/i.test(health)) health = '';   // Smartsheet's blue ball: not started yet
+    if (status === 'blocked') health = 'Off Track';
+    else if (status === 'on hold' && !health) health = 'At Risk';
+    let pct = pctOf(r);
+    if (/^complete(d)?$/.test(status) && pct !== 100) { if (pct != null && !isNaN(pct) && cellText(get(r, 'PercentComplete'))) forcedDone.push(txt(r, 'Title')); pct = 100; }
+    let hidden = false;
+    if (status === 'canceled' || status === 'cancelled') { hidden = true; canceled++; }
+    if (!cellText(end)) { hidden = true; hiddenUndated++; }
+    const refs = cellText(get(r, 'DependsOn')).match(/\bR?\d+/gi) || [];
+    const deps = refs.filter(x => ids.has(x));
+    droppedLinks += refs.length - deps.length;
+    let note = txt(r, 'Notes');
+    const checklist = colBy('checklist items') && cellText(r[colBy('checklist items')]);
+    if (checklist) note = (note ? note + '\n\n' : '') + checklist.split(';').map(s => '- ' + s.trim()).join('\n');
+    after.set(p.id, { pct, custom: Object.fromEntries(customKeys.map(c => [c.name, cellText(r[c.key])])) });
+    return Object.fromEntries([p.id, p.lane, p.sub, txt(r, 'Title'), startOut ?? null, end ?? null, txt(r, 'TaskOwner'),
+      deps.join(', '), note, type, hidden ? 'No' : null, health || null].map((v, i) => [i, v === '' ? null : v]));
+  });
+  const res = rowsFromTable([Object.fromEntries(friendly.map((h, i) => [i, h])), ...out]);
+  res.rows.forEach(row => {
+    const a = after.get(String(row.RowID));
+    if (!a) return;
+    row.PercentComplete = a.pct ?? 0;
+    for (const [name, v] of Object.entries(a.custom)) if (v) row['Import_' + name] = v;
+  });
+  res.customColumns = customKeys.map(c => c.name);
+
+  // the timeline's title: the plan or project name, unless it is a template placeholder
+  const sumName = ctx.summary?.find(r => /^project name$/i.test(cellText(Object.values(r)[0])));
+  const named = [sumName && Object.values(sumName)[1], title].map(v => cellText(v).replace(/^\*+\s*|\s*\*+$/g, '')).find(v => v && !/project name/i.test(v));
+  res.title = named || '';
+  if (hiddenUndated) notes.push(`${hiddenUndated} row${hiddenUndated > 1 ? 's have' : ' has'} no dates. ${hiddenUndated > 1 ? "They're" : "It's"} in the Data view, hidden.`);
+  if (canceled) notes.push(`${canceled} canceled row${canceled > 1 ? 's are' : ' is'} hidden.`);
+  if (droppedLinks) notes.push(`Dropped ${droppedLinks} dependency link${droppedLinks > 1 ? 's' : ''} to group rows.`);
+  if (forcedDone.length) notes.push(`Set ${forcedDone.length} complete row${forcedDone.length > 1 ? 's' : ''} to 100%.`);
+  res.notes = notes;
+  res.mapped = true;
+  return res;
+}
+
+async function loadXlsx(file, opts = {}) {
   const buf = await file.arrayBuffer();
   const files = await unzip(buf);
   const sharedStrings = parseSharedStrings(files['xl/sharedStrings.xml']);
-  const sheetPath = findSheetPath(files, 'TimelineExcel');
-  if (!files[sheetPath]) throw new Error('Sheet contents not found at ' + sheetPath);
-  const rowArrays = parseSheet(files[sheetPath], sharedStrings);
+  // v4.16: the template's TimelineExcel sheet, else Planner's Consolidated Data sheet, else the first sheet
+  const names = workbookSheetNames(files);
+  const sheetName = ['TimelineExcel', 'Consolidated Data'].find(n => names.includes(n)) || names[0];
+  const read = name => {
+    const path = findSheetPath(files, name);
+    if (!files[path]) throw new Error('Sheet contents not found at ' + path);
+    return parseSheet(files[path], sharedStrings);
+  };
+  const rowArrays = read(sheetName);
   if (rowArrays.length < 2) throw new Error('Sheet has no data rows.');
-  return rowsFromTable(rowArrays);
+  if (sheetName === 'TimelineExcel') return rowsFromTable(rowArrays);
+  const planRow = names.includes('Plan') ? read('Plan')[1] : null;   // Planner: Plan ID, Plan name, Date of export
+  return importForeignTable(rowArrays, { fileName: file.name, opts,
+    summary: names.includes('Summary') ? read('Summary') : null, planName: planRow && planRow.B });
 }
 
 // v4.13: CSV, as Lanetrace exports it or as Excel saves "CSV UTF-8". Same headers as the template.
 // Commas, semicolons or tabs, whichever the header row uses. Quoted fields may hold commas and line breaks.
-async function loadCsv(file) {
+async function loadCsv(file, opts = {}) {
   let text = await file.text();
   if (text.charCodeAt(0) === 0xFEFF) text = text.slice(1);
   let delim = null;
@@ -4796,7 +5052,7 @@ async function loadCsv(file) {
   if (field !== '' || row.length) { row.push(field); records.push(row); }
   const table = records.filter(r => r.some(v => v.trim() !== '')).map(r => Object.fromEntries(r.map((v, i) => [i, v.trim() === '' ? null : v])));
   if (table.length < 2) throw new Error('The CSV has no data rows.');
-  return rowsFromTable(table);
+  return importForeignTable(table, { fileName: file.name, opts });   // v4.16: template headers go straight to rowsFromTable
 }
 
 // Turns a header row plus data rows (objects keyed by column) into timeline rows, with load warnings
@@ -4909,19 +5165,33 @@ async function confirmEditsForNewFile(rows, fileName) {
 async function handleFile(file, opts = {}) {
   try {
     const isCsv = /\.(csv|txt)$/i.test(file.name);
-    const { rows, warnings } = await (isCsv ? loadCsv(file) : loadXlsx(file));
+    const loaded = await (isCsv ? loadCsv(file, opts) : loadXlsx(file, opts));
+    const { rows, warnings } = loaded;
     if (!rows.length) throw new Error(['No usable rows found.', ...warnings].join(' '));
     if (!opts.fromSyncFolder) await confirmEditsForNewFile(rows, file.name);
     DATA_ROWS = rows;
     LOADED_FILE_NAME = file.name;
+    // v4.16: columns brought in by an earlier import go; this file's come in below
+    CUSTOM_COLUMNS = CUSTOM_COLUMNS.filter(c => !c.field.startsWith('Import_'));
+    if (loaded.mapped) {   // a mapped Planner, Smartsheet or other export
+      LAST_IMPORT_FILE = file;
+      for (const name of loaded.customColumns) {
+        const field = 'Import_' + name;
+        if (!CUSTOM_COLUMNS.some(c => c.field === field)) CUSTOM_COLUMNS.push({ field, label: name, width: 130, editor: 'text', custom: true });
+      }
+      if (loaded.title && (!SETTINGS.timelineTitle || SETTINGS.timelineTitle === SETTINGS_DEFAULTS.timelineTitle)) {
+        SETTINGS.timelineTitle = loaded.title;
+        saveSettings();
+      }
+    }
     applySettings();
     syncSettingsUi();
     render();
     // cache a copy in the sync folder for auto-reload next session
     if (SYNC_DIR && !opts.fromSyncFolder) {
       try {
-        // the cache is always .xlsx, so a CSV is stored as the Excel template filled with its rows
-        const buf = isCsv ? generateXlsxTemplate({ rows: exportTable(rows).rows, extraColumns: [], creator: 'Lanetrace' }) : await file.arrayBuffer();
+        // the cache is always .xlsx, so a CSV or a mapped export is stored as the Excel template filled with its rows
+        const buf = isCsv || loaded.mapped ? generateXlsxTemplate({ rows: exportTable(rows).rows, extraColumns: [], creator: 'Lanetrace' }) : await file.arrayBuffer();
         const fh = await SYNC_DIR.getFileHandle(DATA_CACHE_FILE, { create: true });
         const s = await fh.createWritable();
         await s.write(buf); await s.close();
@@ -4930,13 +5200,16 @@ async function handleFile(file, opts = {}) {
     fsWriteState();
     if (FS_SUPPORTED && !SYNC_STATUS.linked) {
       let seen = true; try { seen = localStorage.getItem('lanetrace-sync-tip') === '1'; localStorage.setItem('lanetrace-sync-tip', '1'); } catch (_) {}
-      if (!seen) setTimeout(() => toast('Tip: link a sync folder in Settings > Data & sync to keep your edits if browser data is cleared, or to use them on another computer.', '', 9000), 2500);
+      // v4.16: after a mapped load, wait until its message (hidden rows, Change mapping) has had its time
+      if (!seen) setTimeout(() => toast('Tip: link a sync folder in Settings > Data & sync to keep your edits if browser data is cleared, or to use them on another computer.', '', 9000), loaded.mapped ? 9500 : 2500);
     }
     if (warnings.length) toast(`Loaded ${rows.length} rows from ${file.name}. ${warnings.join(' ')}`, 'err', 8000);
+    else if (loaded.mapped) toast([`Loaded ${rows.length} rows from ${file.name}.`, ...loaded.notes].join(' '), '', 9000,
+      { label: 'Change mapping', run: () => handleFile(LAST_IMPORT_FILE, { remap: true }) });
     else toast(`Loaded ${rows.length} rows from ${file.name}`);
   } catch (e) {
-    console.error(e);
-    toast('Load failed: ' + (e.message || e), 'err');
+    if (e.message === 'Load canceled.') toast('Load canceled');
+    else { console.error(e); toast('Load failed: ' + (e.message || e), 'err'); }
   }
 }
 
