@@ -7611,6 +7611,9 @@ function cancelCellEdit() {
 
 function cleanupEditor() {
   const td = GRID_EDITOR.td;
+  // v4.16: clear the state first. Removing the focused editor fires its blur handler, which would commit
+  // (so Escape saved the edit) and clean up a second time (a NotFoundError on Enter).
+  GRID_EDITOR = { td: null, rowKey: null, field: null, original: null };
   if (td) {
     const editor = td.querySelector('.cell-editor');
     if (editor) editor.remove();
@@ -7620,7 +7623,6 @@ function cleanupEditor() {
     if (cell) cell.classList.remove('editing');
     delete td.dataset.editing;
   }
-  GRID_EDITOR = { td: null, rowKey: null, field: null, original: null };
 }
 
 function coerceValue(col, raw) {

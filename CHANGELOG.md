@@ -17,6 +17,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - By swimlane hides the Swimlane and Sub-swimlane columns, since the headers show them. List shows them again
 
 ### Fixed
+- Data view: Escape now cancels a cell edit. It saved the typed text before. Enter no longer throws an error after saving (SharePoint's viewer showed it as "A script didn't run correctly on this page")
 - Excel cells that hold text from a formula, which is how Planner writes its whole export, now read as text. They read as empty before
 - A workbook whose first sheet has the template's headers loads even when that sheet isn't named TimelineExcel
 
