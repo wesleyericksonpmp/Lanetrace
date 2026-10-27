@@ -5,7 +5,7 @@ Notes on using Lanetrace with SharePoint and OneDrive.
 ## Compatibility Status
 
 **Tested and Working:**
-- Opening the HTML file in SharePoint's OneUp viewer
+- Opening the HTML file in SharePoint's OneUp viewer, to view and present (see "Verified in OneUp" below for what works there)
 - Downloading and using locally
 - Storing the HTML file in a document library
 
@@ -15,24 +15,41 @@ Notes on using Lanetrace with SharePoint and OneDrive.
 - Power Automate integration
 
 **Known Limitations:**
-- File System Access API does not work in SharePoint preview (iframe sandbox)
-- Export buttons may be blocked in preview mode
+- Nothing persists in the SharePoint preview: edits, settings and the Data view layout reset when the file is opened again
+- Downloads, printing and browser prompts are blocked in the preview (iframe sandbox), so no export leaves it
+- File System Access API (sync folder) does not work in the preview
 
 ## SharePoint OneUp Viewer
 
-When you click an HTML file in a SharePoint document library, it opens in the OneUp viewer. This is an iframe-based preview.
+When you click an HTML file in a SharePoint document library, it opens in the OneUp viewer. The viewer runs the file in an iframe with `sandbox="allow-scripts"` and nothing else. That means no `allow-same-origin` (no storage), no `allow-downloads`, no `allow-modals` (no print, `prompt` or `confirm`) and no `allow-popups`. Lanetrace detects this and shows a "Limited mode" banner.
 
-### What Works
-- Timeline rendering
-- Theme switching
+### Verified in OneUp, 2026-10-27
+
+Tested in the 3nf7cm tenant (pmpmaker site, Documents › Lanetrace › lanetrace.html), with the build at commit `de62288`, in the Claude desktop app's browser pane (Chromium). The SHA-256 of the uploaded file matched the local build.
+
+**Works:**
+- The timeline and the Data view render, including the Limited mode banner
+- Data view: the List | By swimlane switch, sub-swimlane groups and the hidden lane columns
+- Editing a Data view cell (the change shows on screen for that session)
 - Settings panel
-- Data grid view
-- Print (opens browser print dialog)
+- Status update: Copy prompt put the full prompt (5,677 characters) on the clipboard
 
-### What Doesn't Work
-- File System Access API (sync folder feature)
-- Some exports may fail due to CSP restrictions
-- localStorage may not persist across sessions
+**Doesn't work:**
+- **Saving:** after reopening the file, both test edits were gone, the Data view was back to List and the theme had reset. No message says edits will be lost.
+- **Export to Excel:** the toast said "Exported 22 items to Excel", but no file arrived
+- **Download PNG:** the toast said "PNG downloaded!", but no file arrived
+- **Download SVG:** no file and no message
+- **Copy timeline image:** the clipboard is blocked (`NotAllowedError`). The toast said it downloaded the PNG instead, but no file arrived
+- **Print / PDF:** no print dialog appeared
+- **+ Column:** nothing happens (it uses `prompt`, which the sandbox blocks)
+
+**Not tested here:**
+- Export for PPT and Export to CSV. The clicks missed; both use the same download path as Excel and PNG, so expect them to be blocked too
+- Loading a file (file picker or drop), Planner and Smartsheet imports, Match the columns
+- Dragging rows between swimlanes. The browser pane's simulated drag doesn't start HTML drag and drop
+- Microsoft Edge and Chrome themselves. The sandbox flags are the same in any browser, so downloads, storage and print should be blocked there too
+
+**Bug found and fixed (commit `08478ac`):** pressing Enter in a Data view cell threw `NotFoundError: Failed to execute 'remove' on 'Element'`, which SharePoint showed as "Some content didn't load. A script didn't run correctly on this page." The same fault made Escape save an edit instead of cancelling it. It happened in every browser; OneUp was just the only place that showed the error.
 
 ### Workaround
 
