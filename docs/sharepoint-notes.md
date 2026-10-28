@@ -49,6 +49,8 @@ Tested in the 3nf7cm tenant (pmpmaker site, Documents › Lanetrace › lanetrac
 - Dragging rows between swimlanes. The browser pane's simulated drag doesn't start HTML drag and drop
 - Microsoft Edge and Chrome themselves. The sandbox flags are the same in any browser, so downloads, storage and print should be blocked there too
 
+**Changed in 4.15.0, after this test:** the banner now says edits made in the preview aren't saved, and the export, download, print and copy-image buttons say they're blocked instead of reporting success. + Column and every confirmation (Delete item and others) use Lanetrace's own dialogs, since the sandbox blocks the browser's `prompt` and `confirm`. Not yet re-tested in OneUp.
+
 **Bug found and fixed (commit `08478ac`):** pressing Enter in a Data view cell threw `NotFoundError: Failed to execute 'remove' on 'Element'`, which SharePoint showed as "Some content didn't load. A script didn't run correctly on this page." The same fault made Escape save an edit instead of cancelling it. It happened in every browser; OneUp was just the only place that showed the error.
 
 ### Workaround

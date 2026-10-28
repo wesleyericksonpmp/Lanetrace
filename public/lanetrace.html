@@ -110,7 +110,7 @@ svg { display:block; user-select:none }
 .view-tab:hover { color:var(--text) }
 .view-tab[aria-selected="true"], .view-tab[aria-pressed="true"] { background:var(--card); color:var(--text);
                                   box-shadow:none}
-.data-toolbar .grid-layout { padding:2px }   /* v4.16: List | By swimlane, sized to the toolbar buttons */
+.data-toolbar .grid-layout { padding:2px }   /* v4.15: List | By swimlane, sized to the toolbar buttons */
 .data-toolbar .grid-layout .view-tab { height:28px }
 
 /* data view (v4.0 inline grid editor) */
@@ -148,7 +148,7 @@ svg { display:block; user-select:none }
 .data-grid tbody tr.new-row td { background:rgba(0,114,206,.05) }
 .data-grid .cell { display:block; padding:8px 10px; min-height:34px; line-height:18px;
                    outline:none; cursor:cell; white-space:pre-wrap; word-break:break-word }
-/* v4.16: long imported Row IDs (Planner's are 28 characters) stay on one line instead of stretching the row */
+/* v4.15: long imported Row IDs (Planner's are 28 characters) stay on one line instead of stretching the row */
 .data-grid td.col-rowid .cell { white-space:nowrap; overflow:hidden; text-overflow:ellipsis; max-width:120px }
 .data-grid .cell.focused { box-shadow:inset 0 0 0 2px var(--blue) }
 .data-grid .cell.cell-notes { white-space:nowrap; overflow:hidden; text-overflow:ellipsis; max-width:320px }
@@ -210,7 +210,7 @@ svg { display:block; user-select:none }
   color:var(--blue); font:inherit; font-size:12px; font-weight:600; cursor:pointer }
 .data-grid .grp-add:hover, .data-grid .grp-add-lane:hover { background:rgba(0,114,206,.1) }
 .data-grid .grp-add-lane { margin-left:0 }
-/* v4.16: a sub-swimlane's header sits inside its swimlane, indented and lighter */
+/* v4.15: a sub-swimlane's header sits inside its swimlane, indented and lighter */
 .data-grid tbody tr.grp-sub td, .data-grid tbody tr.grp-sub:hover td { background:var(--card); padding:4px 10px 4px 28px; font-weight:600; font-size:12px; color:var(--muted) }
 .data-grid tbody tr.drop-on td, .data-grid tbody tr.grp-head.drop-on td { background:color-mix(in srgb, var(--blue) 12%, var(--card)) }
 .data-grid .row-grip { display:inline-flex; align-items:center; justify-content:center; width:16px; height:24px; color:var(--muted); cursor:grab; vertical-align:middle }
@@ -419,7 +419,7 @@ body.has-sandbox-banner header { margin-top:44px }
 #toast.on { transform:translateX(-50%) translateY(0); opacity:1 }
 #toast.err { border-color:var(--red); color:var(--red) }
 #toast.has-action.on { pointer-events:auto }
-/* v4.16: the import mapping dialog, inside the choice dialog */
+/* v4.15: the import mapping dialog, inside the choice dialog */
 #choice.imap { width:min(640px, calc(100vw - 32px)) }
 #choice .imap-grid { display:grid; grid-template-columns:1fr 1fr; gap:8px 16px; margin:10px 0 }
 #choice .imap-row { display:flex; flex-direction:column; gap:3px; font-size:12px; color:var(--muted) }
@@ -450,6 +450,8 @@ body.has-sandbox-banner header { margin-top:44px }
 #choice h2 { font-size:15px; margin:0 0 10px }
 #choice .body { font-size:13px; line-height:1.5; color:var(--text) }
 #choice .body p { margin:0 0 8px }
+#choice .ask-field { display:flex; flex-direction:column; gap:6px }
+#choice .ask-field input { font:inherit; padding:7px 9px; border:1px solid var(--border); border-radius:3px; background:var(--card); color:var(--text) }
 #choice .acts { display:flex; gap:8px; justify-content:flex-end; margin-top:16px; flex-wrap:wrap }
 #modal { background:var(--card); border:1px solid var(--border); border-radius:3px;
   width:min(560px, calc(100vw - 32px)); max-height:calc(100vh - 48px);
@@ -573,6 +575,17 @@ body.has-sandbox-banner header { margin-top:44px }
   .chart-card { border:0; box-shadow:none; padding:0; overflow:visible }
   main { padding:0 12px }
   header { border-bottom:1px solid #e6e9ee; box-shadow:none }
+  /* v4.15: the Data view prints the whole table: no toolbar, no scroll box, no row controls, text wraps */
+  .data-toolbar, .data-grid .col-actions, .data-grid .grp-add, .data-grid .col-delete { display:none !important }
+  .data-card { border:0; box-shadow:none; overflow:visible }
+  .data-scroll { overflow:visible !important; max-height:none !important }
+  .data-grid { font-size:9pt; table-layout:auto }
+  .data-grid thead { display:table-header-group }
+  .data-grid thead th { position:static; padding:4px 6px; font-size:7.5pt; white-space:normal }
+  .data-grid .cell { padding:3px 6px; min-height:0; line-height:1.3; white-space:normal !important;
+                     overflow:visible !important; text-overflow:clip !important; max-width:none !important }
+  .data-grid td[data-field="Notes"] .cell { max-width:60mm !important }
+  .data-grid tr { break-inside:avoid }
   @page { size:landscape; margin:12mm }
 }
 
@@ -727,8 +740,8 @@ body.has-sandbox-banner header { margin-top:44px }
 
 <div id="sandbox-banner" class="sandbox-banner" style="display:none">
   <span class="sandbox-icon">⚠</span>
-  <span class="sandbox-msg"><strong>Limited mode:</strong> Export buttons are blocked in SharePoint preview.
-    To use all features: click <strong>⋯ → Download</strong> in SharePoint, then open the downloaded file.</span>
+  <span class="sandbox-msg"><strong>Limited mode:</strong> SharePoint's preview blocks downloads, printing and saving, so edits made here aren't saved.
+    To use everything: click <strong>⋯ → Download</strong> in SharePoint, then open the downloaded file.</span>
   <button id="sandbox-dismiss" class="sandbox-close" aria-label="Dismiss">×</button>
 </div>
 
@@ -2053,7 +2066,7 @@ const LAYOUT = {
 };
 
 // ── settings (persisted) ─────────────────────────────────────────────────
-const PREVIEW_VERSION = 'v4.14.0';
+const PREVIEW_VERSION = 'v4.15.0';
 const SETTINGS_DEFAULTS = {
   theme: 'auto',
   themePack: 'corporate-blue',
@@ -2960,10 +2973,13 @@ function renderMilestoneStrip(strip, yS) {
       + ` data-when="${escapeHtml(dateLabel(r))}" data-type="${escapeHtml(r.ItemType || '')}" data-pct="${r._pct}"`;
     let g = renderMilestoneIcon(shapeKey, p.x, iconCy, rr, fill);
     if (!p.hideLabel) {
-      // card-colored halo keeps leader lines from striking through the text
-      const halo = ' stroke="var(--card)" stroke-width="3" stroke-linejoin="round" paint-order="stroke"';
-      g += `<text x="${p.cx}" y="${titleY}" text-anchor="middle" font-size="${fs}" font-weight="600"${halo}${labelPaint(r, ' class="tl-primary"')}>${escapeHtml(p.title)}</text>`;
-      g += `<text x="${p.cx}" y="${dateY}" text-anchor="middle" font-size="${fs - 1}"${halo} class="tl-muted">${doneDate(p.date)}</text>`;
+      // card-colored backing keeps leader lines from striking through the text. v4.15: a rect, not a text
+      // stroke; a stroked label prints to PDF as a second copy of the text ("AArrcchhiitteeccttuurree").
+      const date = doneDate(p.date);
+      const bw = Math.max(textW(p.title, fs, 600), textW(p.date, fs - 1, 700)) + 6;
+      g += `<rect x="${p.cx - bw / 2}" y="${titleY - fs}" width="${bw}" height="${dateY - titleY + fs + 4}" fill="var(--card)" />`;
+      g += `<text x="${p.cx}" y="${titleY}" text-anchor="middle" font-size="${fs}" font-weight="600"${labelPaint(r, ' class="tl-primary"')}>${escapeHtml(p.title)}</text>`;
+      g += `<text x="${p.cx}" y="${dateY}" text-anchor="middle" font-size="${fs - 1}" class="tl-muted">${date}</text>`;
     }
     marks.push(`<g class="item"${attrs}>${g}</g>`);
   });
@@ -4080,8 +4096,8 @@ function renameSwimlane(oldName, newName) {
 }
 
 // reset all
-document.getElementById('sp-reset-all').addEventListener('click', () => {
-  if (!confirm('Reset all timeline settings to defaults?')) return;
+document.getElementById('sp-reset-all').addEventListener('click', async () => {
+  if (!await askConfirm('Reset settings?', 'Reset all timeline settings to their defaults?', 'Reset')) return;
   SETTINGS = structuredClone(SETTINGS_DEFAULTS);
   saveSettings(); applySettings(); render(); syncSettingsUi();
 });
@@ -4651,7 +4667,7 @@ function toast(msg, kind = 'ok', ms = 3000, action = null) {
   const t = document.getElementById('toast');
   t.textContent = msg;
   t.classList.toggle('err', kind === 'err');
-  t.classList.toggle('has-action', !!action);   // v4.16: an optional button, such as "Change mapping"
+  t.classList.toggle('has-action', !!action);   // v4.15: an optional button, such as "Change mapping"
   if (action) {
     const b = document.createElement('button');
     b.type = 'button'; b.className = 'sp-link'; b.textContent = action.label;
@@ -4766,7 +4782,7 @@ function parseSheet(bytes, sharedStrings) {
       let value;
       if (t === 's')      value = sharedStrings[parseInt(v, 10)];
       else if (t === 'b') value = v === '1';
-      else if (t === 'str') value = v ?? '';   // v4.16: text from a formula; Planner's export writes every cell this way
+      else if (t === 'str') value = v ?? '';   // v4.15: text from a formula; Planner's export writes every cell this way
       else if (t === 'inlineStr') {
         const is = c.getElementsByTagName('is')[0];
         value = is ? [...is.getElementsByTagName('t')].map(t => t.textContent).join('') : '';
@@ -4774,14 +4790,14 @@ function parseSheet(bytes, sharedStrings) {
       else if (v !== undefined) value = parseFloat(v);
       cells[col] = value;
     }
-    // v4.16: Smartsheet keeps parent and child rows as Excel outline levels. Not enumerable, so it is never read as a column.
+    // v4.15: Smartsheet keeps parent and child rows as Excel outline levels. Not enumerable, so it is never read as a column.
     Object.defineProperty(cells, '_lvl', { value: parseInt(row.getAttribute('outlineLevel') || '0', 10) });
     rows.push(cells);
   }
   return rows;
 }
 
-// ── v4.16: import mapper ─────────────────────────────────────────────────
+// ── v4.15: import mapper ─────────────────────────────────────────────────
 // Files without the template's headers (Planner and Smartsheet exports, or any sheet with recognizable headers)
 // are mapped onto the template, then read by rowsFromTable like any template file.
 const IMPORT_FIELDS = [
@@ -5011,7 +5027,7 @@ async function loadXlsx(file, opts = {}) {
   const buf = await file.arrayBuffer();
   const files = await unzip(buf);
   const sharedStrings = parseSharedStrings(files['xl/sharedStrings.xml']);
-  // v4.16: the template's TimelineExcel sheet, else Planner's Consolidated Data sheet, else the first sheet
+  // v4.15: the template's TimelineExcel sheet, else Planner's Consolidated Data sheet, else the first sheet
   const names = workbookSheetNames(files);
   const sheetName = ['TimelineExcel', 'Consolidated Data'].find(n => names.includes(n)) || names[0];
   const read = name => {
@@ -5056,7 +5072,7 @@ async function loadCsv(file, opts = {}) {
   if (field !== '' || row.length) { row.push(field); records.push(row); }
   const table = records.filter(r => r.some(v => v.trim() !== '')).map(r => Object.fromEntries(r.map((v, i) => [i, v.trim() === '' ? null : v])));
   if (table.length < 2) throw new Error('The CSV has no data rows.');
-  return importForeignTable(table, { fileName: file.name, opts });   // v4.16: template headers go straight to rowsFromTable
+  return importForeignTable(table, { fileName: file.name, opts });   // v4.15: template headers go straight to rowsFromTable
 }
 
 // Turns a header row plus data rows (objects keyed by column) into timeline rows, with load warnings
@@ -5175,7 +5191,7 @@ async function handleFile(file, opts = {}) {
     if (!opts.fromSyncFolder) await confirmEditsForNewFile(rows, file.name);
     DATA_ROWS = rows;
     LOADED_FILE_NAME = file.name;
-    // v4.16: columns brought in by an earlier import go; this file's come in below
+    // v4.15: columns brought in by an earlier import go; this file's come in below
     CUSTOM_COLUMNS = CUSTOM_COLUMNS.filter(c => !c.field.startsWith('Import_'));
     if (loaded.mapped) {   // a mapped Planner, Smartsheet or other export
       LAST_IMPORT_FILE = file;
@@ -5210,7 +5226,7 @@ async function handleFile(file, opts = {}) {
     fsWriteState();
     if (FS_SUPPORTED && !SYNC_STATUS.linked) {
       let seen = true; try { seen = localStorage.getItem('lanetrace-sync-tip') === '1'; localStorage.setItem('lanetrace-sync-tip', '1'); } catch (_) {}
-      // v4.16: after a mapped load, wait until its message (hidden rows, Change mapping) has had its time
+      // v4.15: after a mapped load, wait until its message (hidden rows, Change mapping) has had its time
       if (!seen) setTimeout(() => toast('Tip: link a sync folder in Settings > Data & sync to keep your edits if browser data is cleared, or to use them on another computer.', '', 9000), loaded.mapped ? 9500 : 2500);
     }
     if (warnings.length) toast(`Loaded ${rows.length} rows from ${file.name}. ${warnings.join(' ')}`, 'err', 8000);
@@ -5746,6 +5762,25 @@ function exportBaseName() {
   const base = (named ? SETTINGS.timelineTitle : 'Lanetrace').replace(/[\\/:*?"<>|]+/g, '').trim() || 'Lanetrace';
   return `${base}-${new Date().toISOString().slice(0, 10)}`;
 }
+// v4.15: SharePoint's preview runs the file in a sandbox with no downloads, printing or storage. Set by
+// detectSandbox. Export buttons say so there instead of reporting a download that never arrives.
+let SANDBOXED = false;
+const SANDBOX_BLOCKED = ['sp-download-template', 'sp-export-svg', 'sp-export-pdf', 'sp-export-pptx', 'sp-export-png',
+  'sp-export-copy', 'sp-export-xlsx', 'sp-export-csv', 'grid-export-xlsx', 'st-copy-image'];
+function sandboxBlocked() {
+  if (!SANDBOXED) return false;
+  toast('Blocked in the SharePoint preview. Click ⋯ → Download in SharePoint, then open the downloaded file.', 'err', 9000);
+  return true;
+}
+document.addEventListener('click', ev => {
+  const b = ev.target.closest && ev.target.closest('button[id]');
+  if (b && SANDBOX_BLOCKED.includes(b.id) && sandboxBlocked()) { ev.preventDefault(); ev.stopImmediatePropagation(); }
+}, true);
+// v4.15: in-page confirm, since the preview sandbox blocks the browser's confirm() (it returns false unseen)
+function askConfirm(title, bodyText, okLabel) {
+  return askChoice(title, `<p>${escapeHtml(bodyText)}</p>`,
+    [{ label: 'Cancel', value: false }, { label: okLabel, value: true, primary: true }], false);
+}
 function downloadBlob(blob, name) {
   const a = document.createElement('a');
   a.href = URL.createObjectURL(blob);
@@ -5754,6 +5789,7 @@ function downloadBlob(blob, name) {
   setTimeout(() => URL.revokeObjectURL(a.href), 1000);
 }
 function exportExcel() {
+  if (sandboxBlocked()) return;
   const { extra, rows } = exportTable();
   const zip = generateXlsxTemplate({ rows, extraColumns: extra, creator: 'Lanetrace',
     footer: `Exported from Lanetrace v${PREVIEW_VERSION.replace(/^v/, '')} on ${new Date().toISOString().slice(0, 10)}. Load this file back into Lanetrace to restore these items.` });
@@ -5761,6 +5797,7 @@ function exportExcel() {
   toast(`Exported ${rows.length} items to Excel`);
 }
 function exportCsv() {
+  if (sandboxBlocked()) return;
   const { cols, rows } = exportTable();
   const iso = d => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
   const q = v => { const t = v instanceof Date ? iso(v) : String(v); return /[",\r\n]/.test(t) ? `"${t.replace(/"/g, '""')}"` : t; };
@@ -5980,7 +6017,7 @@ async function fsRequestPermission() {
 }
 
 async function fsDisconnect() {
-  if (!confirm('Disconnect the sync folder? Your files stay in place; only the link from this browser is removed.')) return;
+  if (!await askConfirm('Disconnect the sync folder?', 'Your files stay in place. Only the link from this browser is removed.', 'Disconnect')) return;
   SYNC_DIR = null;
   SYNC_STATUS = { linked:false, dirName:'', lastSaved:'', needsPermission:false };
   try { await idbDel('sync-dir'); } catch (_) {}
@@ -6362,11 +6399,11 @@ function duplicateFromEditor() {
   duplicateRow(patch);
 }
 
-function deleteFromEditor() {
+async function deleteFromEditor() {
   if (!EDITOR.key) return;
   const row = findRow(EDITOR.key);
   if (!row) return;
-  if (!confirm(`Delete "${row.Title}"?`)) return;
+  if (!await askConfirm('Delete item?', `Delete "${row.Title}"? Ctrl+Z brings it back.`, 'Delete')) return;
   const addedIdx = findAddedIndex(EDITOR.key);
   if (addedIdx >= 0) {
     SETTINGS.addedItems.splice(addedIdx, 1);
@@ -6425,8 +6462,8 @@ function updateTitleColorMsg() {
   document.getElementById(id).addEventListener('input', updateTitleColorMsg));
 document.getElementById('modal-duplicate').addEventListener('click', duplicateFromEditor);
 document.getElementById('sp-add-item').addEventListener('click', () => openEditor(null));
-document.getElementById('sp-reset-edits').addEventListener('click', () => {
-  if (!confirm('Remove all your overlay edits (renames, additions, deletions)? Base data stays intact.')) return;
+document.getElementById('sp-reset-edits').addEventListener('click', async () => {
+  if (!await askConfirm('Remove your edits?', 'Remove all your edits (renames, additions, deletions)? The loaded data stays as it is.', 'Remove edits')) return;
   SETTINGS.dataOverlay = {}; SETTINGS.addedItems = []; SETTINGS.deletedKeys = [];
   pushHistory();  // Push AFTER changes
   saveSettings(); applySettings(); syncSettingsUi(); render();
@@ -6769,7 +6806,7 @@ function getOrderedColumns() {
   return ordered;
 }
 
-// v4.16: the columns the grid shows. By swimlane hides Swimlane and Sub-swimlane: the group headers say them.
+// v4.15: the columns the grid shows. By swimlane hides Swimlane and Sub-swimlane: the group headers say them.
 const groupedHides = new Set(['Swimlane', 'SubSwimlane']);
 function visibleGridColumns() {
   const cols = getOrderedColumns();
@@ -6887,7 +6924,7 @@ function gridLanes(allRows) {
   if (allRows.some(r => !r.Swimlane)) lanes.push({ name: '', hex: 'transparent' });
   return lanes;
 }
-// v4.16: each swimlane's rows: those with no sub-swimlane first, then each sub-swimlane in the order it first appears
+// v4.15: each swimlane's rows: those with no sub-swimlane first, then each sub-swimlane in the order it first appears
 function laneGroups(allRows, rows) {
   return gridLanes(allRows).map(lane => {
     const inLane = r => (r.Swimlane || '') === lane.name;
@@ -7611,7 +7648,7 @@ function cancelCellEdit() {
 
 function cleanupEditor() {
   const td = GRID_EDITOR.td;
-  // v4.16: clear the state first. Removing the focused editor fires its blur handler, which would commit
+  // v4.15: clear the state first. Removing the focused editor fires its blur handler, which would commit
   // (so Escape saved the edit) and clean up a second time (a NotFoundError on Enter).
   GRID_EDITOR = { td: null, rowKey: null, field: null, original: null };
   if (td) {
@@ -7646,7 +7683,7 @@ function applyCellEdit(rowKey, field, value) {
   GRID_PATCH = { rowKey, field };
   render();
 }
-// v4.16: several fields in one edit, so one undo reverts them all (moving a row to another sub-swimlane)
+// v4.15: several fields in one edit, so one undo reverts them all (moving a row to another sub-swimlane)
 function applyRowEdit(rowKey, patch) {
   const addedIdx = findAddedIndex(rowKey);
   if (addedIdx >= 0) {
@@ -7710,7 +7747,7 @@ function initGrid() {
   paintIcon('grid-add-lane', 'plus');
   document.getElementById('grid-add-lane').addEventListener('click', openLaneModal);
   // v4.14: By swimlane grouping
-  // v4.16: List | By swimlane switch, in place of the Group dropdown
+  // v4.15: List | By swimlane switch, in place of the Group dropdown
   const layoutBtns = [...document.querySelectorAll('.grid-layout .view-tab')];
   const syncLayout = () => layoutBtns.forEach(b => b.setAttribute('aria-pressed', String(b.dataset.group === (SETTINGS.dataGroupBy || ''))));
   layoutBtns.forEach(b => b.addEventListener('click', () => {
@@ -7870,11 +7907,16 @@ function initGrid() {
   });
 
   // v4.2: Add custom column button
-  document.getElementById('grid-add-column').addEventListener('click', () => {
-    const name = prompt('Enter column name:');
-    if (name && name.trim()) {
-      addCustomColumn(name.trim());
-    }
+  // v4.15: in-page dialog, since the preview sandbox blocks prompt()
+  document.getElementById('grid-add-column').addEventListener('click', async () => {
+    const asked = askChoice('Add a column', '<label class="ask-field">Column name<input type="text" id="ask-col-name" maxlength="40" autocomplete="off"></label>',
+      [{ label: 'Cancel', value: false }, { label: 'Add column', value: true, primary: true }], false);
+    const input = document.getElementById('ask-col-name');
+    input.focus();
+    input.onkeydown = e => { if (e.key === 'Enter') document.querySelector('#choice .acts .primary').click(); };
+    const ok = await asked;
+    const name = document.getElementById('ask-col-name')?.value.trim();
+    if (ok && name) addCustomColumn(name);
   });
 
   // v4.2: Delete custom column (via click on delete button in header)
@@ -7883,9 +7925,8 @@ function initGrid() {
     if (deleteBtn) {
       ev.stopPropagation();
       const field = deleteBtn.dataset.field;
-      if (field && confirm('Remove this custom column? Data in this column will be lost.')) {
-        removeCustomColumn(field);
-      }
+      if (field) askConfirm('Remove column?', 'Remove this custom column? Its data will be lost.', 'Remove column')
+        .then(ok => { if (ok) removeCustomColumn(field); });
     }
   });
 
@@ -8307,6 +8348,7 @@ function renderMarkdown(text) {
     }
 
     if (sandboxed) {
+      SANDBOXED = true;
       const banner = document.getElementById('sandbox-banner');
       banner.style.display = 'flex';
       document.body.classList.add('has-sandbox-banner');

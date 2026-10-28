@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [4.15.0] - 2026-10-28
+
 ### Added
 - Load Microsoft Planner and Smartsheet exports. Drop the .xlsx from Planner's Export as Excel or Smartsheet's Export to Excel, and Lanetrace maps it onto its own columns. Planner buckets become swimlanes and the plan name becomes the title, unless you typed your own; the next import replaces a title an import set. In a Smartsheet sheet, indented rows become swimlanes and sub-swimlanes, and parent rows act as grouping. Rows with no start date, or a Duration of 0, become milestones, and Smartsheet predecessors become dependencies. Status carries over: Complete sets 100%, Blocked makes Health Off Track, On Hold makes it At Risk, and Canceled rows are hidden. Rows with no dates load hidden in the Data view. Status, Priority, Labels and Goal come in as Data view columns. The load message says what was hidden or dropped
 - Match the columns: a spreadsheet or CSV whose headers don't match the template opens a dialog to choose which column holds the title, dates, swimlane and the rest, with a preview of the first rows. Swimlanes can come from a column, from the sheet's indent levels, or be a single lane. Lanetrace remembers the choice for files with the same columns, and Change mapping in the load message reopens the dialog
@@ -16,7 +18,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - By swimlane groups sub-swimlanes too. Inside each swimlane, rows with no sub-swimlane come first, then each sub-swimlane under its own indented header with a count and + Add item, which fills in both fields. Drag a row onto a sub-swimlane's header or rows to move it there; dropping it on a swimlane's own header clears the sub-swimlane. One undo reverts the move
 - By swimlane hides the Swimlane and Sub-swimlane columns, since the headers show them. List shows them again
 
+- SharePoint preview: the Limited mode banner now says edits made there aren't saved. Export, download, print and copy-image buttons say they're blocked in the preview and point to ⋯ → Download, instead of reporting a download that never arrives
+- Confirmations (delete item, remove a column, reset settings, remove edits, disconnect the sync folder) and + Column's name box are Lanetrace dialogs instead of the browser's. SharePoint's preview blocks the browser's, so Delete and + Column did nothing there
+- Print from the Data view prints the whole table: no toolbar, scroll box or row controls, with long text wrapped and the header repeated on each page
+
 ### Fixed
+- Milestone labels above the timescale print to PDF once. Each one was in the PDF's text twice, so copying or searching it gave "AArrcchhiitteeccttuurree"
 - Data view: Escape now cancels a cell edit. It saved the typed text before. Enter no longer throws an error after saving (SharePoint's viewer showed it as "A script didn't run correctly on this page")
 - Excel cells that hold text from a formula, which is how Planner writes its whole export, now read as text. They read as empty before
 - A workbook whose first sheet has the template's headers loads even when that sheet isn't named TimelineExcel
