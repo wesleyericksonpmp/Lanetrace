@@ -2636,8 +2636,12 @@ function dataIssues(rows) {
 }
 function updateCounts(rows) {
   const el = document.getElementById('counts');
-  const hidden = Math.max(0, mergedRows().length - rows.length);
-  el.textContent = `${rows.length} items shown · ${hidden} hidden`;
+  const total = mergedRows().length;
+  const hidden = Math.max(0, total - rows.length);
+  // v4.15.1: with filter text, count only the items it matches, the same rule the all-hidden screen uses
+  const q = FILTER_TEXT.trim().toLowerCase();
+  el.textContent = q ? `${rows.filter(r => !r._summary && filterHits(r, q)).length} of ${total} shown`
+                     : `${rows.length} items shown · ${hidden} hidden`;
   const issues = dataIssues(rows);
   if (!issues.length) return;
   const b = document.createElement('button');
@@ -2763,8 +2767,9 @@ function render() {
     svgEl.setAttribute('viewBox', '0 0 800 200');
     svgEl.setAttribute('width', 800); svgEl.setAttribute('height', 200);
     svgEl.innerHTML = '';
-    document.getElementById('date-range').textContent = totalIn ? '—' : 'No dates yet';
-    document.getElementById('counts').textContent = totalIn ? `0 items shown · ${DATA_ROWS.length} in data` : 'No items';
+    const dr = document.getElementById('date-range');
+    dr.textContent = dr.dataset.range = totalIn ? '—' : 'No dates yet';
+    if (totalIn) updateCounts([]); else document.getElementById('counts').textContent = 'No items';
     renderLegend();
     return;
   }
@@ -2834,8 +2839,8 @@ function render() {
   svg.innerHTML = parts.join('');
 
   // header text
-  document.getElementById('date-range').textContent =
-    `${fmtMDY(range.start)} – ${fmtMDY(range.end)}`;
+  const dr = document.getElementById('date-range');
+  dr.textContent = dr.dataset.range = `${fmtMDY(range.start)} – ${fmtMDY(range.end)}`;
   updateCounts(rows);
 
   renderLegend();
@@ -6626,7 +6631,9 @@ function applyFilter() {
   });
   updateEmptyLayer();
 }
-document.getElementById('filter-input').addEventListener('input', ev => { FILTER_TEXT = ev.target.value; applyFilter(); });
+document.getElementById('filter-input').addEventListener('input', ev => {
+  FILTER_TEXT = ev.target.value; applyFilter(); updateCounts(prepareRows());
+});
 
 // v4.15.1: "No items yet" and "All items hidden" as an HTML layer over the chart card.
 // The filter only dims items, so the hidden check reads the data, not the rendered rows.
@@ -6642,10 +6649,14 @@ const EMPTY_HTML = `<div class="empty-drop">
   <div class="empty-chips">Reads <span>Lanetrace template</span><span>Excel</span><span>CSV</span><span>Planner</span><span>Smartsheet</span></div>
   <div class="empty-foot">New to Lanetrace? <button class="empty-link" type="button" data-empty="template">Download the template</button></div>
 </div>`;
+// same fields applyFilter matches on the drawn items
+function filterHits(r, q) {
+  return ((r.Title || '') + ' ' + (r.TaskOwner || '') + ' ' + (r.Notes || '')).toLowerCase().includes(q);
+}
 function hiddenStateHtml(all) {
   const off = SETTINGS.swimlaneHidden || {};
   const q = FILTER_TEXT.trim().toLowerCase();
-  const hits = r => ((r.Title || '') + ' ' + (r.TaskOwner || '') + ' ' + (r.Notes || '')).toLowerCase().includes(q);
+  const hits = r => filterHits(r, q);
   const onTl = all.filter(r => isRowShown(r) && !off[r.Swimlane]);
   if (onTl.length && !(q && !onTl.some(hits))) return '';
   const causes = [], btns = [];
@@ -6674,6 +6685,9 @@ function updateEmptyLayer() {
   const all = mergedRows();
   const html = all.length ? hiddenStateHtml(all) : EMPTY_HTML;
   if (html !== EMPTY_SHOWN) { layer.innerHTML = html; EMPTY_SHOWN = html; }
+  // no date range for items nobody can see
+  const dr = document.getElementById('date-range');
+  if (all.length) dr.textContent = html ? '—' : (dr.dataset.range || '—');
   layer.hidden = !html;
   const card = document.getElementById('view-timeline');
   card.classList.toggle('has-empty', !!html);
@@ -6690,7 +6704,7 @@ document.getElementById('empty-layer').addEventListener('click', ev => {
     if ((SETTINGS.deletedKeys || []).length) { SETTINGS.deletedKeys = []; pushHistory(); }
     document.getElementById('sp-reset-data').click();
   } else if (act === 'filter') {
-    document.getElementById('filter-input').value = ''; FILTER_TEXT = ''; applyFilter();
+    document.getElementById('filter-input').value = ''; FILTER_TEXT = ''; applyFilter(); updateCounts(prepareRows());
   } else if (act === 'lanes') {
     SETTINGS.swimlaneHidden = {};
     pushHistory(); saveSettings(); applySettings(); render(); syncSettingsUi();

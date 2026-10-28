@@ -15,6 +15,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Load the sample on the empty screen also brings back sample items you deleted. Restore sample in Settings still keeps them deleted
 - Both screens are HTML over the chart, so they never land in an SVG, PNG, PowerPoint or print export. Print leaves them out
 
+### Fixed
+- The header count now counts the filter. With filter text it reads "6 of 22 shown", and "0 of 22 shown" when nothing matches. It used to say "9 items shown" while the chart said every item was hidden. When nothing shows, the header shows no date range, instead of dates for items you can't see
+
 ## [4.15.0] - 2026-10-28
 
 ### Added
