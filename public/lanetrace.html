@@ -401,6 +401,34 @@ body[data-layout="centered"] main { padding-inline:max(32px, calc((100vw - 1600p
   border:3px dashed var(--blue); display:none; align-items:center; justify-content:center;
   font-size:20px; font-weight:700; color:var(--blue); pointer-events:none }
 #dropzone.on { display:flex }
+/* v4.15.1: empty and all-hidden states. HTML over the chart card, so it never reaches an export */
+.chart-card { position:relative }
+.chart-card.has-empty { overflow:hidden; min-height:420px }
+.empty-layer { position:absolute; inset:0; z-index:2; background:var(--card); display:flex;
+  align-items:center; justify-content:center; padding:32px; text-align:center }
+.empty-layer[hidden] { display:none }
+.empty-drop { width:min(620px, 100%); border:1.5px dashed color-mix(in srgb, var(--blue) 35%, var(--border));
+  border-radius:6px; padding:34px 36px; background:color-mix(in srgb, var(--blue) 3%, var(--card)) }
+.empty-drop.drag { border-color:var(--blue); background:color-mix(in srgb, var(--blue) 10%, var(--card)) }
+.empty-ico { width:44px; height:44px; border-radius:50%; display:inline-flex; align-items:center; justify-content:center;
+  margin-bottom:10px; background:color-mix(in srgb, var(--blue) 12%, var(--card)); color:var(--blue) }
+.empty-ico svg { width:22px; height:22px }
+.empty-ico.off { width:40px; height:40px; background:var(--bg); color:var(--muted) }
+.empty-ico.off svg { width:20px; height:20px }
+.empty-layer h2 { margin:0 0 4px; font-size:18px; font-weight:600 }
+.empty-layer p { margin:0 0 18px; color:var(--muted) }
+.empty-hid { max-width:560px }
+.empty-row { display:flex; gap:8px; justify-content:center; flex-wrap:wrap }
+.empty-drop .empty-row { margin-bottom:16px }
+.empty-layer .sp-btn { font-size:13px; font-weight:600; padding:8px 14px; display:inline-flex; align-items:center; gap:6px }
+.empty-layer .sp-btn svg { margin:0 }
+.empty-layer kbd { font:11px ui-monospace,Consolas,monospace; border:1px solid var(--border); border-bottom-width:2px;
+  border-radius:3px; padding:0 5px; color:var(--muted); background:var(--card) }
+.empty-chips { display:flex; gap:6px; justify-content:center; flex-wrap:wrap; align-items:center; font-size:12px; color:var(--muted) }
+.empty-chips span { border:1px solid var(--border); border-radius:10px; padding:1px 9px; background:var(--card) }
+.empty-foot { margin-top:14px; font-size:12px; color:var(--muted) }
+.empty-link { border:0; background:none; color:var(--blue); font:inherit; cursor:pointer; padding:2px }
+.empty-link:hover { text-decoration:underline }
 /* sandbox detection banner */
 .sandbox-banner { position:fixed; top:0; left:0; right:0; z-index:300; display:flex; align-items:center;
   gap:12px; padding:10px 16px; background:#fef3c7; border-bottom:1px solid #f59e0b; font-size:13px }
@@ -568,7 +596,8 @@ body.has-sandbox-banner header { margin-top:44px }
 /* print stylesheet */
 @media print {
   header .controls, #settings-panel, #sp-backdrop, #tt, #modal-back, #palette-back,
-  #dropzone, #toast, #help-modal, #status-modal, #tl .tl-ui, .view-tabs, #issues-pop, #choice-back { display:none !important }
+  #dropzone, #toast, #help-modal, #status-modal, #tl .tl-ui, .view-tabs, #issues-pop, #choice-back, .empty-layer { display:none !important }
+  .chart-card.has-empty { min-height:0 }
   html, body { background:#fff !important }
   /* v4.13: the timeline prints at its full width and was cut off at the right edge; scale it to the page */
   #tl { width:100% !important; height:auto !important }
@@ -1080,6 +1109,7 @@ body.has-sandbox-banner header { margin-top:44px }
 <main>
   <div class="chart-card" id="view-timeline">
     <svg id="tl" xmlns="http://www.w3.org/2000/svg"></svg>
+    <div class="empty-layer" id="empty-layer" hidden></div>
   </div>
   <div class="data-card" id="view-data" hidden>
     <div class="data-toolbar">
@@ -1836,6 +1866,9 @@ const DATA = [
 
 // Inlined Lucide icons — { name: '<svg …>…</svg>' }. Used by iconSvg() below.
 const ICONS = {'clipboard-list': '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="8" height="4" x="8" y="2" rx="1" ry="1"/><path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"/><path d="M12 11h4"/><path d="M12 16h4"/><path d="M8 11h.01"/><path d="M8 16h.01"/></svg>', "plus": "<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\" > <path d=\"M5 12h14\" /> <path d=\"M12 5v14\" /> </svg>", "more-vertical": "<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\"><circle cx=\"12\" cy=\"12\" r=\"1\"/><circle cx=\"12\" cy=\"5\" r=\"1\"/><circle cx=\"12\" cy=\"19\" r=\"1\"/></svg>", "trash-2": "<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\" > <path d=\"M10 11v6\" /> <path d=\"M14 11v6\" /> <path d=\"M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6\" /> <path d=\"M3 6h18\" /> <path d=\"M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2\" /> </svg>", "circle-help": "<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\" > <circle cx=\"12\" cy=\"12\" r=\"10\" /> <path d=\"M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3\" /> <path d=\"M12 17h.01\" /> </svg>", "moon": "<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\" > <path d=\"M20.985 12.486a9 9 0 1 1-9.473-9.472c.405-.022.617.46.402.803a6 6 0 0 0 8.268 8.268c.344-.215.825-.004.803.401\" /> </svg>", "sun": "<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\" > <circle cx=\"12\" cy=\"12\" r=\"4\" /> <path d=\"M12 2v2\" /> <path d=\"M12 20v2\" /> <path d=\"m4.93 4.93 1.41 1.41\" /> <path d=\"m17.66 17.66 1.41 1.41\" /> <path d=\"M2 12h2\" /> <path d=\"M20 12h2\" /> <path d=\"m6.34 17.66-1.41 1.41\" /> <path d=\"m19.07 4.93-1.41 1.41\" /> </svg>", "settings-2": "<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\" > <path d=\"M14 17H5\" /> <path d=\"M19 7h-9\" /> <circle cx=\"17\" cy=\"17\" r=\"3\" /> <circle cx=\"7\" cy=\"7\" r=\"3\" /> </svg>", "x": "<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\" > <path d=\"M18 6 6 18\" /> <path d=\"m6 6 12 12\" /> </svg>", "undo-2": "<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\" > <path d=\"M9 14 4 9l5-5\" /> <path d=\"M4 9h10.5a5.5 5.5 0 0 1 5.5 5.5v0a5.5 5.5 0 0 1-5.5 5.5H11\" /> </svg>", "redo-2": "<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\" > <path d=\"m15 14 5-5-5-5\" /> <path d=\"M20 9H9.5A5.5 5.5 0 0 0 4 14.5v0A5.5 5.5 0 0 0 9.5 20H13\" /> </svg>", "info": "<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\" > <circle cx=\"12\" cy=\"12\" r=\"10\" /> <path d=\"M12 16v-4\" /> <path d=\"M12 8h.01\" /> </svg>", "square-pen": "<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\" > <path d=\"M12 3H5a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7\" /> <path d=\"M18.375 2.625a1 1 0 0 1 3 3l-9.013 9.014a2 2 0 0 1-.853.505l-2.873.84a.5.5 0 0 1-.62-.62l.84-2.873a2 2 0 0 1 .506-.852z\" /> </svg>", "sticky-note": "<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\" > <path d=\"M16 3H5a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V8Z\" /> <path d=\"M15 3v4a2 2 0 0 0 2 2h4\" /> </svg>", "grip-vertical": "<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\"><circle cx=\"9\" cy=\"12\" r=\"1\"/><circle cx=\"9\" cy=\"5\" r=\"1\"/><circle cx=\"9\" cy=\"19\" r=\"1\"/><circle cx=\"15\" cy=\"12\" r=\"1\"/><circle cx=\"15\" cy=\"5\" r=\"1\"/><circle cx=\"15\" cy=\"19\" r=\"1\"/></svg>"};
+// v4.15.1: Lucide upload and eye-off, for the empty and all-hidden states
+ICONS['upload'] = '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v12"/><path d="m17 8-5-5-5 5"/><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/></svg>';
+ICONS['eye-off'] = '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10.733 5.076a10.744 10.744 0 0 1 11.205 6.575 1 1 0 0 1 0 .696 10.747 10.747 0 0 1-1.444 2.49"/><path d="M14.084 14.158a3 3 0 0 1-4.242-4.242"/><path d="M17.479 17.499a10.75 10.75 0 0 1-15.417-5.151 1 1 0 0 1 0-.696 10.75 10.75 0 0 1 4.446-5.143"/><path d="m2 2 20 20"/></svg>';
 function iconSvg(name) { return ICONS[name] || ''; }
 // Prepend a Lucide icon into an element by id, preserving any existing label children.
 function paintIcon(elId, name) {
@@ -2066,7 +2099,7 @@ const LAYOUT = {
 };
 
 // ── settings (persisted) ─────────────────────────────────────────────────
-const PREVIEW_VERSION = 'v4.15.0';
+const PREVIEW_VERSION = 'v4.15.1';
 const SETTINGS_DEFAULTS = {
   theme: 'auto',
   themePack: 'corporate-blue',
@@ -2724,16 +2757,14 @@ function render() {
   const rows = prepareRows();
   const svgEl = document.getElementById('tl');
   // empty state — before any layout math
+  // v4.15.1: the message and buttons live in #empty-layer (updateEmptyLayer), so the SVG stays blank
   if (rows.length === 0) {
     const totalIn = mergedRows().length;
-    const msg = totalIn === 0
-      ? 'No items yet. Press N to add one, drop an Excel or CSV file, or use the settings panel.'
-      : 'All items hidden. Turn a swimlane back on, clear the filter, or check the "Shown" column.';
     svgEl.setAttribute('viewBox', '0 0 800 200');
     svgEl.setAttribute('width', 800); svgEl.setAttribute('height', 200);
-    svgEl.innerHTML = `<text x="400" y="100" text-anchor="middle" font-size="14" class="tl-muted">${escapeHtml(msg)}</text>`;
-    document.getElementById('date-range').textContent = '—';
-    document.getElementById('counts').textContent = `0 items shown · ${DATA_ROWS.length} in data`;
+    svgEl.innerHTML = '';
+    document.getElementById('date-range').textContent = totalIn ? '—' : 'No dates yet';
+    document.getElementById('counts').textContent = totalIn ? `0 items shown · ${DATA_ROWS.length} in data` : 'No items';
     renderLegend();
     return;
   }
@@ -6593,8 +6624,87 @@ function applyFilter() {
     const hay = ((el.dataset.title || '') + ' ' + (el.dataset.owner || '') + ' ' + (el.dataset.notes || '')).toLowerCase();
     el.classList.toggle('dim', !hay.includes(q));
   });
+  updateEmptyLayer();
 }
 document.getElementById('filter-input').addEventListener('input', ev => { FILTER_TEXT = ev.target.value; applyFilter(); });
+
+// v4.15.1: "No items yet" and "All items hidden" as an HTML layer over the chart card.
+// The filter only dims items, so the hidden check reads the data, not the rendered rows.
+const EMPTY_HTML = `<div class="empty-drop">
+  <span class="empty-ico">${iconSvg('upload')}</span>
+  <h2>Start your timeline</h2>
+  <p>Drop a spreadsheet here, or choose a way to begin.</p>
+  <div class="empty-row">
+    <button class="sp-btn primary" type="button" data-empty="load">Load a file</button>
+    <button class="sp-btn" type="button" data-empty="add">${iconSvg('plus')}Add item <kbd>N</kbd></button>
+    <button class="sp-btn" type="button" data-empty="sample">Load the sample</button>
+  </div>
+  <div class="empty-chips">Reads <span>Lanetrace template</span><span>Excel</span><span>CSV</span><span>Planner</span><span>Smartsheet</span></div>
+  <div class="empty-foot">New to Lanetrace? <button class="empty-link" type="button" data-empty="template">Download the template</button></div>
+</div>`;
+function hiddenStateHtml(all) {
+  const off = SETTINGS.swimlaneHidden || {};
+  const q = FILTER_TEXT.trim().toLowerCase();
+  const hits = r => ((r.Title || '') + ' ' + (r.TaskOwner || '') + ' ' + (r.Notes || '')).toLowerCase().includes(q);
+  const onTl = all.filter(r => isRowShown(r) && !off[r.Swimlane]);
+  if (onTl.length && !(q && !onTl.some(hits))) return '';
+  const causes = [], btns = [];
+  // name every cause that hides an item; the filter only when no item it could show matches it
+  if (q && (onTl.length || !all.some(hits))) {
+    causes.push(`the filter "${escapeHtml(FILTER_TEXT.trim())}" matches nothing`);
+    btns.push(['filter', 'Clear the filter']);
+  }
+  const lanes = new Set(all.filter(r => off[r.Swimlane]).map(r => r.Swimlane)).size;
+  const unshown = all.filter(r => !isRowShown(r)).length;
+  if (lanes) { causes.push(`${lanes} swimlane${lanes === 1 ? ' is' : 's are'} turned off`); btns.push(['lanes', 'Show all swimlanes']); }
+  if (unshown) { causes.push(`${unshown} item${unshown === 1 ? ' has' : 's have'} Shown set to false`); btns.push(['data', 'Open the Data view']); }
+  const s = causes.length > 1 ? causes.slice(0, -1).join(', ') + ', and ' + causes[causes.length - 1] : (causes[0] || '');
+  const n = all.length;
+  return `<div class="empty-hid">
+  <span class="empty-ico off">${iconSvg('eye-off')}</span>
+  <h2>${n === 1 ? 'The only item is hidden' : `All ${n} items are hidden`}</h2>
+  <p>${s ? s[0].toUpperCase() + s.slice(1) + '.' : ''}</p>
+  <div class="empty-row">${btns.map(([k, label], i) =>
+    `<button class="sp-btn${i ? '' : ' primary'}" type="button" data-empty="${k}">${label}</button>`).join('')}</div>
+</div>`;
+}
+let EMPTY_SHOWN = null;   // last HTML written, so a re-render keeps focus and the drag highlight
+function updateEmptyLayer() {
+  const layer = document.getElementById('empty-layer');
+  const all = mergedRows();
+  const html = all.length ? hiddenStateHtml(all) : EMPTY_HTML;
+  if (html !== EMPTY_SHOWN) { layer.innerHTML = html; EMPTY_SHOWN = html; }
+  layer.hidden = !html;
+  const card = document.getElementById('view-timeline');
+  card.classList.toggle('has-empty', !!html);
+  if (html) card.scrollLeft = 0;
+}
+document.getElementById('empty-layer').addEventListener('click', ev => {
+  const b = ev.target.closest('[data-empty]'); if (!b) return;
+  const act = b.dataset.empty;
+  if (act === 'load') document.getElementById('sp-file-input').click();
+  else if (act === 'add') openEditor(null);
+  else if (act === 'template') document.getElementById('sp-download-template').click();
+  else if (act === 'sample') {
+    // deleted sample items stay deleted on a plain restore; this screen exists to bring them back
+    if ((SETTINGS.deletedKeys || []).length) { SETTINGS.deletedKeys = []; pushHistory(); }
+    document.getElementById('sp-reset-data').click();
+  } else if (act === 'filter') {
+    document.getElementById('filter-input').value = ''; FILTER_TEXT = ''; applyFilter();
+  } else if (act === 'lanes') {
+    SETTINGS.swimlaneHidden = {};
+    pushHistory(); saveSettings(); applySettings(); render(); syncSettingsUi();
+    toast('Showing all swimlanes');
+  } else if (act === 'data') switchView('data');
+});
+// a file dragged over the layer lights up the dashed area; the page-wide drop handler loads it
+['dragenter', 'dragover'].forEach(t => document.getElementById('empty-layer').addEventListener(t, ev => {
+  const d = ev.currentTarget.querySelector('.empty-drop'); if (d && !GRID_ROW_DRAG) d.classList.add('drag');
+}));
+['dragleave', 'drop'].forEach(t => document.getElementById('empty-layer').addEventListener(t, ev => {
+  if (t === 'dragleave' && ev.currentTarget.contains(ev.relatedTarget)) return;
+  const d = ev.currentTarget.querySelector('.empty-drop'); if (d) d.classList.remove('drag');
+}));
 
 // Re-apply filter after every render (SVG elements are rebuilt);
 // also keep the grid in sync when the Data view is active.

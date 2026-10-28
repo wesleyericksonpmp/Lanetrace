@@ -7,6 +7,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [4.15.1] - 2026-10-28
+
+### Changed
+- An empty timeline is now a place to start. Drop a spreadsheet on the dashed area, or use Load a file, Add item (N) or Load the sample. It lists what Lanetrace reads (Lanetrace template, Excel, CSV, Planner, Smartsheet) and links to the template. The header says "No dates yet" and "No items"
+- When items exist but none show, the chart says how many are hidden and why: the filter matches nothing, swimlanes are turned off, or items have Shown set to false. Only the matching buttons appear: Clear the filter, Show all swimlanes, Open the Data view
+- Load the sample on the empty screen also brings back sample items you deleted. Restore sample in Settings still keeps them deleted
+- Both screens are HTML over the chart, so they never land in an SVG, PNG, PowerPoint or print export. Print leaves them out
+
 ## [4.15.0] - 2026-10-28
 
 ### Added
