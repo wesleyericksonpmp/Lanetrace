@@ -497,6 +497,16 @@ body.has-sandbox-banner header { margin-top:44px }
   border-radius:3px; background:var(--bg); color:var(--text); outline:none }
 .field input:focus, .field select:focus, .field textarea:focus { border-color:var(--blue) }
 .field textarea { min-height:70px; resize:vertical; font-family:inherit }
+#f-desc, #f-update { min-height:52px }
+/* v4.16: Expand notes, and the Updates log under its box */
+.edit-toolbar .notes-expand { margin-left:auto }
+.edit-toolbar .notes-expand[aria-pressed="true"] { background:var(--card); border-color:var(--border); color:var(--text) }
+#modal.notes-wide { width:min(960px, calc(100vw - 32px)) }
+#modal.notes-wide #f-notes { min-height:max(240px, calc(100vh - 360px)) }
+.f-updates { list-style:none; margin:4px 0 0; padding:0; max-height:220px; overflow-y:auto; border-top:1px solid var(--border) }
+.f-updates li { padding:6px 0; border-bottom:1px solid var(--border); font-size:13px }
+.f-updates .f-upd-when { display:block; font-size:11px; color:var(--muted); margin-bottom:2px }
+.f-updates .md p { margin:0 }
 /* editing toolbar (v4.3.2 - Markdown formatting) */
 .edit-toolbar { display:flex; gap:2px; padding:4px; background:var(--bg); border:1px solid var(--border);
   border-bottom:0; border-radius:3px 3px 0 0; flex-wrap:wrap }
@@ -752,6 +762,7 @@ body.has-sandbox-banner header { margin-top:44px }
 #tt.on { opacity:1 }
 #tt .tt-title { font-weight:700; color:var(--text); margin-bottom:2px; font-size:13px }
 #tt .tt-meta { color:var(--muted); margin-bottom:6px }
+#tt .tt-desc { color:var(--text); margin-bottom:6px; white-space:pre-wrap }
 #tt .tt-notes { color:var(--text); white-space:pre-wrap }
 #tt .tt-notes.md { white-space:normal }
 #tt .tt-notes.md strong { font-weight:700 }
@@ -1116,6 +1127,7 @@ body.has-sandbox-banner header { margin-top:44px }
       <div class="view-tabs grid-layout" role="group" aria-label="Data view layout">
         <button class="view-tab" type="button" data-group="" aria-pressed="true" title="Every item in one list">List</button>
         <button class="view-tab" type="button" data-group="swimlane" aria-pressed="false" title="Items under a header per swimlane and sub-swimlane">By swimlane</button>
+        <button class="view-tab" type="button" data-group="milestones" aria-pressed="false" title="Milestones, events and decisions, by date">Milestones</button>
       </div>
       <button class="sp-btn primary" id="grid-add-row" type="button" title="Open the item form for a new item (N)"><span class="btn-label">New item</span></button>
       <button class="sp-btn" id="grid-add-lane" type="button" title="Add a swimlane"><span class="btn-label">New swimlane</span></button>
@@ -1186,6 +1198,10 @@ body.has-sandbox-banner header { margin-top:44px }
         <div class="field">
           <label for="f-title">Title <span class="char-hint">(max 100)</span></label>
           <input id="f-title" type="text" required maxlength="100">
+        </div>
+        <div class="field">
+          <label for="f-desc">Description</label>
+          <textarea id="f-desc" rows="2" placeholder="What this item covers: scope, deliverables, definition of done"></textarea>
         </div>
         <div class="field-row">
           <div class="field">
@@ -1266,8 +1282,17 @@ body.has-sandbox-banner header { margin-top:44px }
             <span class="sep"></span>
             <button type="button" data-md="ol" title="Numbered list"><svg viewBox="0 0 24 24"><line x1="10" y1="6" x2="21" y2="6"/><line x1="10" y1="12" x2="21" y2="12"/><line x1="10" y1="18" x2="21" y2="18"/><path d="M4 6h1v4"/><path d="M4 10h2"/><path d="M6 18H4c0-1 2-2 2-3s-1-1.5-2-1"/></svg></button>
             <button type="button" data-md="ul" title="Bullet list"><svg viewBox="0 0 24 24"><line x1="9" y1="6" x2="20" y2="6"/><line x1="9" y1="12" x2="20" y2="12"/><line x1="9" y1="18" x2="20" y2="18"/><circle cx="4" cy="6" r="1.5"/><circle cx="4" cy="12" r="1.5"/><circle cx="4" cy="18" r="1.5"/></svg></button>
+            <button type="button" id="notes-expand" class="notes-expand" title="Expand notes" aria-pressed="false"><svg viewBox="0 0 24 24"><path d="M15 3h6v6"/><path d="M9 21H3v-6"/><path d="M21 3l-7 7"/><path d="M3 21l7-7"/></svg></button>
           </div>
-          <textarea id="f-notes" placeholder="Detail, definition of done, links"></textarea>
+          <textarea id="f-notes" placeholder="Links, decisions, context"></textarea>
+        </div>
+      </section>
+
+      <section class="f-sec">
+        <div class="field">
+          <label for="f-update">Updates <span class="char-hint">(each one is saved with the date and time)</span></label>
+          <textarea id="f-update" rows="2" placeholder="Add an update"></textarea>
+          <ol class="f-updates" id="f-updates" aria-label="Earlier updates, newest first"></ol>
         </div>
       </section>
 
@@ -2099,7 +2124,7 @@ const LAYOUT = {
 };
 
 // ── settings (persisted) ─────────────────────────────────────────────────
-const PREVIEW_VERSION = 'v4.15.1';
+const PREVIEW_VERSION = 'v4.16.0';
 const SETTINGS_DEFAULTS = {
   theme: 'auto',
   themePack: 'corporate-blue',
@@ -2138,11 +2163,12 @@ const SETTINGS_DEFAULTS = {
   dataOverlay:  {},     // { rowKey: { field: newValue, ... } }
   addedItems:   [],     // freshly-created items (each carries _rowKey)
   deletedKeys:  [],     // keys of base rows the user hid via delete
+  rowOrder:     [],     // v4.16: row keys in Data view order, set once a row is inserted above or below another
   // v4.0 — user-editable header title and current view
   timelineTitle:    'Lanetrace',
   timelineSubtitle: '',
   activeView:       'timeline',  // 'timeline' | 'data'
-  dataGroupBy:      ''           // v4.14: Data view grouping, '' | 'swimlane'
+  dataGroupBy:      ''           // v4.14: Data view grouping, '' | 'swimlane' | 'milestones' (v4.16)
 };
 // v4.4: Theme packs (drop-in CSS variable sets)
 const THEME_PACKS = {
@@ -2325,7 +2351,13 @@ function mergedRows() {
       const patch = overlay[r._rowKey];
       return patch ? { ...r, ...patch, _rowKey: r._rowKey, _isBase: true, _edited: true } : r;
     });
-  return [...base, ...added];
+  const all = [...base, ...added];
+  // v4.16: rows inserted above or below another keep that place. Rows missing from the saved order stay after it.
+  const order = SETTINGS.rowOrder || [];
+  if (!order.length) return all;
+  const pos = new Map(order.map((k, i) => [k, i]));
+  return all.map((r, i) => [r, pos.has(r._rowKey) ? pos.get(r._rowKey) : order.length + i])
+    .sort((a, b) => a[1] - b[1]).map(x => x[0]);
 }
 
 // Detect swimlanes from the data. Preserves user's saved order for known names,
@@ -2389,6 +2421,8 @@ const parseDate = s => {
 const dayDiff   = (a, b) => Math.round((a - b) / 86400000);
 const fmtMD     = d => d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
 const fmtMDY    = d => d.toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' });
+// v4.16: MM/DD/YYYY, for Data view date cells
+const fmtNum    = d => `${String(d.getMonth() + 1).padStart(2, '0')}/${String(d.getDate()).padStart(2, '0')}/${d.getFullYear()}`;
 const escapeHtml = v => String(v == null ? '' : v)
   .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
   .replace(/"/g, '&quot;').replace(/'/g, '&#x27;');
@@ -2783,7 +2817,8 @@ function render() {
   // 'rows' keeps every one in its swimlane; 'mixed' sends only items with a Strip Row; 'above' sends all
   const inStrip = r => isMs(r) && (placement === 'above' || (placement === 'mixed' && parseInt(r.MilestoneTier, 10) >= 1));
   const msRows = rows.filter(inStrip);
-  const bands = computeRowBands(rows.filter(r => !inStrip(r)));
+  // v4.16: rows with no readable date (a blank row from Insert above) aren't drawn; row packing crashed on them
+  const bands = computeRowBands(rows.filter(r => !inStrip(r) && (r._at || (r._start && r._end))));
 
   // width tuning — target ~1600px total; scale pxPerDay to fit.
   // v4.13: Auto (1600) now fits the chart area of the window, so the whole range shows without sideways scrolling
@@ -3006,6 +3041,7 @@ function renderMilestoneStrip(strip, yS) {
     if (p.tier > 0) leaders.push(`<line x1="${p.x}" y1="${baseY}" x2="${p.x}" y2="${yS}" stroke="${fill}" stroke-width="1" opacity=".55" />`);
     const attrs = ` data-key="${escapeHtml(r._rowKey || '')}" data-title="${escapeHtml(r.Title || '')}"`
       + ` data-owner="${escapeHtml(r.TaskOwner || '')}" data-notes="${escapeHtml(r.Notes || '')}" data-health="${escapeHtml(healthAttr(r))}"`
+      + ` data-desc="${escapeHtml(r.Description || '')}" data-update="${escapeHtml(latestUpdate(r))}"`
       + ` data-when="${escapeHtml(dateLabel(r))}" data-type="${escapeHtml(r.ItemType || '')}" data-pct="${r._pct}"`;
     let g = renderMilestoneIcon(shapeKey, p.x, iconCy, rr, fill);
     if (!p.hideLabel) {
@@ -3407,6 +3443,7 @@ function renderItem(r, cy, dateToX, sw) {
   const dataAttrs = ` data-key="${escapeHtml(r._rowKey||'')}" data-title="${escapeHtml(r.Title||'')}"`
     + ` data-owner="${escapeHtml(r.TaskOwner||'')}" data-health="${escapeHtml(healthAttr(r))}"`
     + ` data-notes="${escapeHtml(r.Notes||'')}"`
+    + ` data-desc="${escapeHtml(r.Description||'')}" data-update="${escapeHtml(latestUpdate(r))}"`
     + ` data-when="${escapeHtml(dateLabel(r))}"`
     + ` data-type="${escapeHtml(r._summary ? 'Swimlane summary' : (r.ItemType || ''))}"`
     + ` data-pct="${r._pct}"`
@@ -3507,6 +3544,11 @@ function starPath(cx, cy, r1, r2, fill) {
   return `<polygon points="${pts.join(' ')}" fill="${fill}" stroke="#fff" stroke-width="1" />`;
 }
 
+// v4.16: the newest Updates entry as one line, for the tooltip and the status update
+function latestUpdate(r) {
+  const e = parseUpdates(r.Updates)[0];
+  return e ? (e.stamp ? e.stamp.split(' ')[0] + ': ' : '') + mdToPlain(e.text) : '';
+}
 function dateLabel(r) {
   if (r._start && r._end) return `${fmtMDY(r._start)} → ${fmtMDY(r._end)}`;
   if (r._at) return fmtMDY(r._at);
@@ -3590,12 +3632,15 @@ function wireTooltips() {
     const type  = el.dataset.type;
     const owner = el.dataset.owner;
     const notes = el.dataset.notes;
+    const desc = el.dataset.desc, update = el.dataset.update;
     const hv = el.dataset.health || '', auto = hv.startsWith('auto:'), health = auto ? hv.slice(5) : hv;
     const pct   = el.dataset.summaryLane ? 0 : (Number(el.dataset.pct) || 0);   // a summary title already states it
     tt.innerHTML = `
       <div class="tt-title">${escapeHtml(title)}</div>
       <div class="tt-meta">${escapeHtml(type)} · ${escapeHtml(when)}${pct ? ' · ' + pct + '%' : ''}</div>
+      ${desc ? `<div class="tt-desc">${escapeHtml(desc)}</div>` : ''}
       ${notes ? `<div class="tt-notes md">${renderMarkdown(notes)}</div>` : ''}
+      ${update ? `<div class="tt-owner">Latest update: ${escapeHtml(update)}</div>` : ''}
       ${owner ? `<div class="tt-owner">Owner: ${escapeHtml(owner)}</div>` : ''}
       ${health ? `<div class="tt-owner">Health: ${healthDot(health)}${escapeHtml(health)}${auto ? ' (auto)' : ''}</div>` : ''}
       <div style="margin-top:6px;color:var(--blue);font-weight:600;font-size:11px">${el.dataset.summaryLane ? 'Click or press Enter to expand' : 'Click or press Enter to edit'}</div>
@@ -4582,6 +4627,8 @@ function buildStatusPrompt(o) {
       if (deps) s += ` | Depends on: ${deps}`;
       const n = String(it.r.Notes || '').replace(/\s+/g, ' ').trim();
       if (o.notes && n) s += ` | Notes: ${n.length > 300 ? n.slice(0, 297) + '...' : n}`;
+      const u = latestUpdate(it.r);
+      if (o.notes && u) s += ` | Latest update: ${u.length > 300 ? u.slice(0, 297) + '...' : u}`;
       return s;
     }).join('\n');
     return `${k}\n${body}`;
@@ -4799,7 +4846,7 @@ const FRIENDLY_TO_INTERNAL = {
   'Milestone/Task Title':'Title',
   'Start date':'StartDate','End date':'EndDate',
   '% Complete':'PercentComplete',
-  'Owner':'TaskOwner','Depends on':'DependsOn','Notes':'Notes',
+  'Owner':'TaskOwner','Depends on':'DependsOn','Notes':'Notes','Description':'Description','Updates':'Updates',
   'Item Type':'ItemType','Label Position':'LabelPosition','Title Color':'TitleColor',
   'Milestone Shape':'MilestoneShape','Bar Style':'BarStyle',
   'Shown':'IsShown','Color Category':'ColorCategory','Milestone Row':'MilestoneTier','Health':'Health'
@@ -4844,7 +4891,9 @@ const IMPORT_FIELDS = [
   { f: 'SubSwimlane',     label: 'Sub-swimlane', syn: ['sub-swimlane'] },
   { f: 'PercentComplete', label: '% Complete',   syn: ['% complete', 'percent complete', 'progress', '% done'] },
   { f: 'TaskOwner',       label: 'Owner',        syn: ['assigned to', 'owner', 'assignee'] },
-  { f: 'Notes',           label: 'Notes',        syn: ['notes', 'description', 'comments'] },
+  { f: 'Description',     label: 'Description',  syn: ['description'] },
+  { f: 'Notes',           label: 'Notes',        syn: ['notes', 'comments'] },
+  { f: 'Updates',         label: 'Updates',      syn: ['updates', 'status updates'] },
   { f: 'RowID',           label: 'Row ID',       syn: ['row id', 'task id', 'id', 'unique id'] },
   { f: 'DependsOn',       label: 'Depends on',   syn: ['predecessors', 'depends on', 'dependencies'] },
   { f: 'Status',          label: 'Status',       syn: ['status', 'state'] },
@@ -5007,7 +5056,7 @@ async function importForeignTable(table, ctx) {
   const ids = new Set(items.map(p => p.id));
   let droppedLinks = 0, hiddenUndated = 0, canceled = 0;
   const forcedDone = [];
-  const friendly = ['Row ID', 'Swimlane', 'Sub-swimlane', 'Milestone/Task Title', 'Start date', 'End date', 'Owner', 'Depends on', 'Notes', 'Item Type', 'Shown', 'Health'];
+  const friendly = ['Row ID', 'Swimlane', 'Sub-swimlane', 'Milestone/Task Title', 'Start date', 'End date', 'Owner', 'Depends on', 'Notes', 'Item Type', 'Shown', 'Health', 'Description', 'Updates'];
   const after = new Map();   // values set after rowsFromTable: % Complete and the custom columns
   const customKeys = IMPORT_CUSTOM.map(name => ({ name, key: name === 'Status' ? get.key('Status') : colBy(name.toLowerCase()) })).filter(c => c.key);
   const out = items.map(p => {
@@ -5035,7 +5084,7 @@ async function importForeignTable(table, ctx) {
     if (checklist) note = (note ? note + '\n\n' : '') + checklist.split(';').map(s => '- ' + s.trim()).join('\n');
     after.set(p.id, { pct, custom: Object.fromEntries(customKeys.map(c => [c.name, cellText(r[c.key])])) });
     return Object.fromEntries([p.id, p.lane, p.sub, txt(r, 'Title'), startOut ?? null, end ?? null, txt(r, 'TaskOwner'),
-      deps.join(', '), note, type, hidden ? 'No' : null, health || null].map((v, i) => [i, v === '' ? null : v]));
+      deps.join(', '), note, type, hidden ? 'No' : null, health || null, txt(r, 'Description'), txt(r, 'Updates')].map((v, i) => [i, v === '' ? null : v]));
   });
   const res = rowsFromTable([Object.fromEntries(friendly.map((h, i) => [i, h])), ...out]);
   res.rows.forEach(row => {
@@ -5214,7 +5263,7 @@ async function confirmEditsForNewFile(rows, fileName) {
     `<p>If this file is a newer version of your plan, use it as it is. Ctrl+Z brings the edits back.</p>`,
     [{ label: 'Keep my edits', value: true }, { label: 'Use the file as it is', value: false, primary: true }], false);
   if (keep) return;
-  SETTINGS.dataOverlay = {}; SETTINGS.addedItems = []; SETTINGS.deletedKeys = [];
+  SETTINGS.dataOverlay = {}; SETTINGS.addedItems = []; SETTINGS.deletedKeys = []; SETTINGS.rowOrder = [];
   pushHistory();
 }
 
@@ -5294,6 +5343,9 @@ const TEMPLATE_COLUMNS = [
   { h: 'Milestone/Task Title', w: 40, kind: 'wrap', req: true, accepts: 'Text, up to 100 characters',
     what: 'The label on the timeline.', ex: 'API build',
     hint: 'The label shown on the timeline. Under about 60 characters fits best.' },
+  { h: 'Description', w: 40, kind: 'wrap', req: false, accepts: 'Text',
+    what: 'What the item covers: scope, deliverables, definition of done. Shows under the title in the tooltip and item form.', ex: 'Configure surveys for 22 service lines',
+    hint: 'What the item covers: scope, deliverables, definition of done. Shows under the title in the tooltip and item form.' },
   { h: 'Start date', w: 15, kind: 'date', req: false, accepts: 'Date',
     what: 'First day of a task or phase. Leave blank for a milestone, event or decision.', ex: '2026-11-02',
     hint: 'First day of a task or phase. Leave blank for a milestone, event or decision.' },
@@ -5312,6 +5364,9 @@ const TEMPLATE_COLUMNS = [
   { h: 'Notes', w: 46, kind: 'wrap', req: false, accepts: 'Text with basic Markdown',
     what: 'Detail for the tooltip and item panel. Supports **bold**, *italic*, # headings, - bullets and 1. numbered lists.', ex: '**Scope:** login, profile',
     hint: 'Detail for the tooltip and item panel. Supports **bold**, *italic*, # headings, - bullets and 1. numbered lists.' },
+  { h: 'Updates', w: 46, kind: 'wrap', req: false, accepts: 'Dated entries, newest first',
+    what: 'Running status log. Lanetrace adds each new update to the top with its date and time. One entry per line, starting with the stamp in brackets.', ex: '[10/29/2026 2:05 PM] Vendor confirmed the SFTP account',
+    hint: 'Running status log, newest first. Each entry starts with its date and time in brackets, like [10/29/2026 2:05 PM].' },
   { h: 'Item Type', w: 14, kind: 'text', req: false, accepts: 'Task, Phase, Milestone, Event, Decision',
     what: 'What to draw. Blank lets Lanetrace decide from the dates (see How Lanetrace reads your data).', ex: 'Phase',
     hint: 'Blank lets Lanetrace decide: no start date or a same-day start and end = Milestone, 92 days or less = Task, longer = Phase.',
@@ -5426,15 +5481,15 @@ function generateXlsxTemplate(opts = {}) {
   const day = (mo, d) => new Date(y, m + mo, d);
   const monthEnd = mo => new Date(y, m + mo + 1, 0);
   const samples = opts.rows || [
-    // ID, Swimlane, Sub, Title, Start, End, %, Owner, Depends on, Notes, Type, Label, Shape, Bar, MsRow, Shown, Color, TitleColor, Health
-    [1, 'Product', '', 'Discovery and requirements', day(0, 1), monthEnd(1), 100, 'Product team', '', '**Scope:** customer interviews and a journey map', 'Phase'],
-    [2, 'Product', '', 'Requirements sign-off', null, monthEnd(1), null, 'Sponsor', '', '', 'Milestone'],
-    [3, 'Engineering', 'Backend', 'API build', day(1, 1), monthEnd(4), 40, 'Backend team', '', 'Item Type left blank: Lanetrace reads the dates and draws a Phase.', '', '', '', '', '', '', '', '', 'At Risk'],
-    [4, 'Engineering', 'Frontend', 'Portal UI', day(2, 1), monthEnd(4), 15, 'Frontend team', '2, 5', '', 'Task', 'Auto', '', 'Flat'],
-    [5, 'Engineering', '', 'Architecture review', null, day(1, 15), null, 'Tech lead', '', 'Go or no-go on the hosting design', 'Decision'],
-    [6, 'Marketing', '', 'Launch announcement', null, day(5, 10), null, 'Marketing', '', '', 'Event', 'Above'],
-    [7, 'Operations', '', 'Go-live', null, monthEnd(5), null, 'Program office', '3, 4', '', 'Milestone', '', 'flag', '', '', '', '#E2A32D'],
-    [8, 'Operations', '', 'Legacy decommission', day(6, 1), monthEnd(7), 0, 'Operations', '7', 'Shown is No, so this row stays out of the timeline until you change it.', 'Phase', '', '', '', '', 'No']
+    // ID, Swimlane, Sub, Title, Description, Start, End, %, Owner, Depends on, Notes, Updates, Type, Label, Shape, Bar, MsRow, Shown, Color, TitleColor, Health
+    [1, 'Product', '', 'Discovery and requirements', 'Customer interviews and a journey map, ending in the requirements the build starts from', day(0, 1), monthEnd(1), 100, 'Product team', '', '**Scope:** customer interviews and a journey map', '', 'Phase'],
+    [2, 'Product', '', 'Requirements sign-off', '', null, monthEnd(1), null, 'Sponsor', '', '', '', 'Milestone'],
+    [3, 'Engineering', 'Backend', 'API build', '', day(1, 1), monthEnd(4), 40, 'Backend team', '', 'Item Type left blank: Lanetrace reads the dates and draws a Phase.', `[${fmtNum(day(0, 3))} 9:30 AM] Auth service is two weeks behind, so Health is At Risk`, '', '', '', '', '', '', '', '', 'At Risk'],
+    [4, 'Engineering', 'Frontend', 'Portal UI', '', day(2, 1), monthEnd(4), 15, 'Frontend team', '2, 5', '', '', 'Task', 'Auto', '', 'Flat'],
+    [5, 'Engineering', '', 'Architecture review', '', null, day(1, 15), null, 'Tech lead', '', 'Go or no-go on the hosting design', '', 'Decision'],
+    [6, 'Marketing', '', 'Launch announcement', '', null, day(5, 10), null, 'Marketing', '', '', '', 'Event', 'Above'],
+    [7, 'Operations', '', 'Go-live', '', null, monthEnd(5), null, 'Program office', '3, 4', '', '', 'Milestone', '', 'flag', '', '', '', '#E2A32D'],
+    [8, 'Operations', '', 'Legacy decommission', '', day(6, 1), monthEnd(7), 0, 'Operations', '7', 'Shown is No, so this row stays out of the timeline until you change it.', '', 'Phase', '', '', '', '', 'No']
   ];
   let rowsXml = `<row r="1" ht="32" customHeight="1">` +
     cols.map((c, i) => cell(`${colLetter(i)}1`, c.h, c.req ? S.hdrReq : S.hdrOpt)).join('') + '</row>';
@@ -6095,7 +6150,7 @@ async function fsWriteStateNow() {
 
 // ── undo / redo history ─────────────────────────────────────────────────
 const HISTORY = { stack: [], cursor: -1, MAX: 30 };
-const HISTORY_KEYS = ['dataOverlay','addedItems','deletedKeys','swimlaneColors','swimlaneTextColors','swimlaneOrder','swimlaneHidden','timelineTitle','timelineSubtitle'];
+const HISTORY_KEYS = ['dataOverlay','addedItems','deletedKeys','rowOrder','swimlaneColors','swimlaneTextColors','swimlaneOrder','swimlaneHidden','timelineTitle','timelineSubtitle'];
 function snapshotForHistory() {
   const s = {}; HISTORY_KEYS.forEach(k => { s[k] = SETTINGS[k]; });
   return JSON.stringify(s);
@@ -6195,6 +6250,7 @@ function openEditor(key, defaults = {}) {
   const type = (row && effectiveItemType(row)) || 'Milestone';
   document.getElementById('f-type').value    = type;
   document.getElementById('f-title').value   = row?.Title || '';
+  document.getElementById('f-desc').value    = row?.Description || '';
   document.getElementById('f-sublane').value = row?.SubSwimlane || '';
   // Canonical schema: StartDate populated for Task/Phase; EndDate carries the anchor date for milestones.
   // When editing a milestone-family row, the "Date" input reads/writes EndDate; f-start/f-end read StartDate/EndDate.
@@ -6222,6 +6278,10 @@ function openEditor(key, defaults = {}) {
   document.getElementById('f-deps').value    = parseDeps(row?.DependsOn).join(', ');
   populateDepSelect(found);
   document.getElementById('f-notes').value   = row?.Notes || '';
+  EDITOR.updates = row?.Updates || null;
+  document.getElementById('f-update').value  = '';
+  renderUpdateList(EDITOR.updates);
+  setNotesExpanded(false);
   document.getElementById('f-shown').checked = row ? isRowShown(row) : true;
   { const bs = String(row?.BarStyle || '').trim().toLowerCase();
     document.getElementById('f-barstyle').value = ['flat', 'chevron', 'pill'].includes(bs) ? bs : ''; }
@@ -6276,6 +6336,9 @@ function readEditorForm() {
     TaskOwner:       document.getElementById('f-owner').value.trim() || null,
     DependsOn:       parseDeps(document.getElementById('f-deps').value).join(', ') || null,
     Notes:           document.getElementById('f-notes').value.trim() || null,
+    Description:     document.getElementById('f-desc').value.trim() || null,
+    Updates:         document.getElementById('f-update').value.trim()
+                       ? addUpdate(EDITOR.updates, document.getElementById('f-update').value) : (EDITOR.updates || null),
     IsShown:         document.getElementById('f-shown').checked
   };
 }
@@ -6315,6 +6378,27 @@ function saveEditor() {
     if (tr) tr.scrollIntoView({ block: 'center' });
   }
 }
+
+// v4.16: earlier updates under the Add an update box, newest first
+function renderUpdateList(log) {
+  const list = document.getElementById('f-updates');
+  const entries = parseUpdates(log);
+  list.innerHTML = entries.map(e => `<li>${e.stamp ? `<span class="f-upd-when">${escapeHtml(e.stamp)}</span>` : ''}` +
+    `<div class="md">${renderMarkdown(e.text)}</div></li>`).join('');
+  list.hidden = !entries.length;
+}
+// v4.16: Expand gives Notes most of the window; it resets each time the form opens
+function setNotesExpanded(on) {
+  document.getElementById('modal').classList.toggle('notes-wide', on);
+  const b = document.getElementById('notes-expand');
+  b.setAttribute('aria-pressed', String(on));
+  b.title = on ? 'Shrink notes' : 'Expand notes';
+}
+document.getElementById('notes-expand').addEventListener('click', () => {
+  const on = !document.getElementById('modal').classList.contains('notes-wide');
+  setNotesExpanded(on);
+  if (on) document.getElementById('f-notes').focus();
+});
 
 // Custom Data view columns get text fields under "More fields", so the form edits everything the grid does
 function renderCustomFields(row) {
@@ -6500,7 +6584,7 @@ document.getElementById('modal-duplicate').addEventListener('click', duplicateFr
 document.getElementById('sp-add-item').addEventListener('click', () => openEditor(null));
 document.getElementById('sp-reset-edits').addEventListener('click', async () => {
   if (!await askConfirm('Remove your edits?', 'Remove all your edits (renames, additions, deletions)? The loaded data stays as it is.', 'Remove edits')) return;
-  SETTINGS.dataOverlay = {}; SETTINGS.addedItems = []; SETTINGS.deletedKeys = [];
+  SETTINGS.dataOverlay = {}; SETTINGS.addedItems = []; SETTINGS.deletedKeys = []; SETTINGS.rowOrder = [];
   pushHistory();  // Push AFTER changes
   saveSettings(); applySettings(); syncSettingsUi(); render();
   toast('Overlay cleared (Ctrl+Z to undo)');
@@ -6626,7 +6710,7 @@ function applyFilter() {
   const q = FILTER_TEXT.trim().toLowerCase();
   document.querySelectorAll('#tl .item').forEach(el => {
     if (!q) { el.classList.remove('dim'); return; }
-    const hay = ((el.dataset.title || '') + ' ' + (el.dataset.owner || '') + ' ' + (el.dataset.notes || '')).toLowerCase();
+    const hay = ((el.dataset.title || '') + ' ' + (el.dataset.owner || '') + ' ' + (el.dataset.notes || '') + ' ' + (el.dataset.desc || '')).toLowerCase();
     el.classList.toggle('dim', !hay.includes(q));
   });
   updateEmptyLayer();
@@ -6651,7 +6735,7 @@ const EMPTY_HTML = `<div class="empty-drop">
 </div>`;
 // same fields applyFilter matches on the drawn items
 function filterHits(r, q) {
-  return ((r.Title || '') + ' ' + (r.TaskOwner || '') + ' ' + (r.Notes || '')).toLowerCase().includes(q);
+  return ((r.Title || '') + ' ' + (r.TaskOwner || '') + ' ' + (r.Notes || '') + ' ' + (r.Description || '')).toLowerCase().includes(q);
 }
 function hiddenStateHtml(all) {
   const off = SETTINGS.swimlaneHidden || {};
@@ -6867,6 +6951,7 @@ const GRID_COLUMNS = [
   { field: 'Swimlane',        label: 'Swimlane',     width: 160, editor: 'choice', source: 'swimlanes' },
   { field: 'SubSwimlane',     label: 'Sub-swimlane', width: 130, editor: 'text' },
   { field: 'Title',           label: 'Title',        width: 300, editor: 'text' },
+  { field: 'Description',     label: 'Description',  width: 280, editor: 'text' },
   { field: 'StartDate',       label: 'Start',        width: 120, editor: 'date' },
   { field: 'EndDate',         label: 'End',          width: 120, editor: 'date' },
   { field: 'PercentComplete', label: '% Complete',   width: 90,  editor: 'number', min: 0, max: 100 },
@@ -6875,6 +6960,7 @@ const GRID_COLUMNS = [
   { field: 'TaskOwner',       label: 'Owner',        width: 220, editor: 'text' },
   { field: 'DependsOn',       label: 'Depends on',   width: 110, editor: 'text' },
   { field: 'Notes',           label: 'Notes',        width: 320, editor: 'text' },
+  { field: 'Updates',         label: 'Updates',      width: 300, editor: 'append' },
   { field: 'ItemType',        label: 'Item Type',    width: 110, editor: 'choice',
     choices: ['', 'Task', 'Phase', 'Milestone', 'Event', 'Decision'] },
   { field: 'LabelPosition',   label: 'Label Pos',    width: 100, editor: 'choice',
@@ -6932,9 +7018,19 @@ function getOrderedColumns() {
 
 // v4.15: the columns the grid shows. By swimlane hides Swimlane and Sub-swimlane: the group headers say them.
 const groupedHides = new Set(['Swimlane', 'SubSwimlane']);
+// v4.16: Milestones hides the columns a single date doesn't use, and calls End "Date"
+const milestoneHides = new Set(['StartDate', 'BarStyle']);
 function visibleGridColumns() {
   const cols = getOrderedColumns();
+  if (SETTINGS.dataGroupBy === 'milestones')
+    return cols.filter(c => !milestoneHides.has(c.field)).map(c => c.field === 'EndDate' ? { ...c, label: 'Date' } : c);
   return SETTINGS.dataGroupBy === 'swimlane' ? cols.filter(c => !groupedHides.has(c.field)) : cols;
+}
+// v4.16: the Milestones view: milestones, events and decisions by date, undated last
+function milestoneRows(rows) {
+  const t = r => { const d = parseDate(r.EndDate); return d ? d.getTime() : Infinity; };
+  return rows.filter(r => ['Milestone', 'Event', 'Decision'].includes(effectiveItemType(r)))
+    .map((r, i) => [r, i]).sort((a, b) => t(a[0]) - t(b[0]) || a[1] - b[1]).map(x => x[0]);
 }
 
 function addCustomColumn(label) {
@@ -7030,7 +7126,8 @@ function renderDataGrid() {
   // body: use merged rows in the same order the timeline sees them
   const allRows = mergedRows();
   populateFilterDropdowns(allRows);
-  const rows = applyGridFilters(allRows);
+  let rows = applyGridFilters(allRows);
+  if (SETTINGS.dataGroupBy === 'milestones') rows = milestoneRows(rows);
   refreshIssueMap();
   tbody.innerHTML = SETTINGS.dataGroupBy === 'swimlane'
     ? renderGroupedRows(allRows, rows, cols)
@@ -7061,6 +7158,7 @@ function laneGroups(allRows, rows) {
 // The grid's rows in the order shown, for keyboard moves
 function gridRows() {
   const all = mergedRows(), rows = applyGridFilters(all);
+  if (SETTINGS.dataGroupBy === 'milestones') return milestoneRows(rows);
   if (SETTINGS.dataGroupBy !== 'swimlane') return rows;
   return laneGroups(all, rows).flatMap(g => [...g.direct, ...g.subs.flatMap(s => s.rows)]);
 }
@@ -7186,17 +7284,48 @@ function renderCellDisplay(r, col) {
     return `<div class="cell cell-barstyle" tabindex="0">${preview}<span class="${cls}">${escapeHtml(label)}</span></div>`;
   }
   const text = raw == null ? '' : String(raw);
+  if (col.editor === 'date' && text) {   // v4.16: MM/DD/YYYY; unreadable text shows as typed
+    const d = parseDate(text);
+    return `<div class="cell" tabindex="0">${escapeHtml(d ? fmtNum(d) : text)}</div>`;
+  }
   if (col.field === 'Health') {   // v4.14: colored dot; blank reads Auto
     return text ? `<div class="cell cell-health" tabindex="0">${healthDot(text)}${escapeHtml(text)}</div>`
                 : `<div class="cell cell-health" tabindex="0"><span class="muted">Auto</span></div>`;
   }
-  if (col.field === 'Notes' && text) {
+  if (col.field === 'Updates' && text) {   // v4.16: the latest entry; typing in the cell adds a new one
+    const last = parseUpdates(text)[0];
+    return `<div class="cell cell-notes" tabindex="0" title="${escapeHtml(text)}">` +
+      (last.stamp ? `<span class="muted">${escapeHtml(last.stamp.split(' ')[0])}</span> ` : '') + `${escapeHtml(mdToPlain(last.text))}</div>`;
+  }
+  if (col.field === 'Updates') return '<div class="cell" tabindex="0"><span class="muted">Add an update</span></div>';
+  if ((col.field === 'Notes' || col.field === 'Description') && text) {
     // v4.12: one line of plain text so rows keep an even height; the full note shows on hover and in the item form
     const plain = mdToPlain(text);
     return `<div class="cell cell-notes" tabindex="0" title="${escapeHtml(text)}">${escapeHtml(plain)}</div>`;
   }
   if (col.field === 'RowID' && text.length > 12) return `<div class="cell" tabindex="0" title="${escapeHtml(text)}">${escapeHtml(text)}</div>`;
   return `<div class="cell" tabindex="0">${escapeHtml(text)}</div>`;
+}
+// v4.16: Updates is a running log, newest first. Each entry starts with its date and time in brackets.
+const UPDATE_STAMP = /^\[(\d{1,2}\/\d{1,2}\/\d{4} \d{1,2}:\d{2} [AP]M)\] ?/;
+function updateStamp(d = new Date()) {
+  const h = d.getHours();
+  return `${fmtNum(d)} ${h % 12 || 12}:${String(d.getMinutes()).padStart(2, '0')} ${h < 12 ? 'AM' : 'PM'}`;
+}
+// Text without stamps (typed in Excel) reads as one entry with no stamp
+function parseUpdates(text) {
+  const out = [];
+  for (const line of String(text || '').split(/\r?\n/)) {
+    const m = UPDATE_STAMP.exec(line);
+    if (m) out.push({ stamp: m[1], text: line.slice(m[0].length) });
+    else if (out.length) out[out.length - 1].text += '\n' + line;
+    else out.push({ stamp: '', text: line });
+  }
+  return out.map(e => ({ ...e, text: e.text.trim() })).filter(e => e.stamp || e.text);
+}
+function addUpdate(log, entry) {
+  const prev = String(log || '').trim();
+  return `[${updateStamp()}] ${entry.trim()}` + (prev ? '\n' + prev : '');
 }
 // Markdown Notes as a single line: drop markers, keep link text, join lines with a middle dot.
 function mdToPlain(md) {
@@ -7291,6 +7420,11 @@ function openCellEditor(td) {
     editor.className = 'cell-editor';
     editor.placeholder = '#RRGGBB';
     editor.value = current || '';
+  } else if (col.editor === 'append') {   // v4.16: Updates: the box starts empty and adds an entry
+    editor = document.createElement('input');
+    editor.type = 'text';
+    editor.className = 'cell-editor';
+    editor.placeholder = 'Add an update';
   } else {
     editor = document.createElement('input');
     editor.type = 'text';
@@ -7756,7 +7890,8 @@ function commitCellEdit(nextMove) {
   const allCols = [...GRID_COLUMNS, ...CUSTOM_COLUMNS];
   const col = allCols.find(c => c.field === g.field);
   const rawValue = readEditorValue();
-  const value = coerceValue(col, rawValue);
+  const added = col.editor === 'append' ? String(rawValue || '').trim() : '';
+  const value = col.editor === 'append' ? (added ? addUpdate(g.original, added) : g.original) : coerceValue(col, rawValue);
   const rowKey = g.rowKey;
   const field = g.field;
   cleanupEditor();
@@ -8132,23 +8267,22 @@ function gridInsertRow(referenceKey, position) {
     _rowKey: 'new_' + Date.now().toString(36) + '_' + Math.random().toString(36).slice(2, 6),
     RowID: nextId,
     Swimlane: refRow.Swimlane || (SWIMLANES[0] && SWIMLANES[0].name) || null,
+    SubSwimlane: refRow.SubSwimlane || null,
     Title: '',
     IsShown: true,
     ItemType: refRow.ItemType || null,
     LabelPosition: 'Auto',
     PercentComplete: 0
   };
+  // v4.16: the Milestones view sorts by date, so a new milestone takes the reference row's date to land beside it
+  if (SETTINGS.dataGroupBy === 'milestones') { newRow.ItemType = effectiveItemType(refRow); newRow.EndDate = refRow.EndDate || null; }
 
-  // Find where to insert in addedItems based on reference row position
-  // If reference is an added item, insert near it; otherwise append to addedItems
-  const refAddedIdx = findAddedIndex(referenceKey);
-  if (refAddedIdx >= 0) {
-    const insertIdx = position === 'above' ? refAddedIdx : refAddedIdx + 1;
-    SETTINGS.addedItems.splice(insertIdx, 0, newRow);
-  } else {
-    // Reference is a base row — just append to addedItems (will appear after similar swimlane rows)
-    SETTINGS.addedItems = [...(SETTINGS.addedItems || []), newRow];
-  }
+  // v4.16: save the row order with the new row next to the reference row. It used to go to the end
+  // whenever the reference row came from the loaded file.
+  SETTINGS.addedItems = [...(SETTINGS.addedItems || []), newRow];
+  const keys = allRows.map(r => r._rowKey);
+  keys.splice(position === 'above' ? refIdx : refIdx + 1, 0, newRow._rowKey);
+  SETTINGS.rowOrder = keys;
 
   pushHistory();
   saveSettings();

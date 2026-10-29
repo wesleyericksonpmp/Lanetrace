@@ -7,6 +7,23 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [4.16.0] - 2026-10-29
+
+### Added
+- Description field: what an item covers, such as scope, deliverables and definition of done. It sits under the title in the item form and the tooltip, has its own Data view column, and loads and exports as a Description column in Excel and CSV. Planner's Description now loads here instead of into Notes
+- Updates field, a running status log. Type an update in the item form or in the Data view's Updates cell, and Lanetrace adds it to the top with the date and time, like SharePoint's Append changes. The item form lists earlier updates under the box, the Data view shows the latest one, and the tooltip and status update show the latest entry. Excel and CSV keep the whole log in one Updates cell, newest first, one entry per line starting with the stamp in brackets: [10/29/2026 2:05 PM] Vendor confirmed the SFTP account
+- Milestones view in the Data view, next to List and By swimlane. It lists milestones, events and decisions by date, hides Start and Bar Style, and calls End "Date"
+- Expand button in the Notes toolbar widens the item form and gives Notes most of the window
+
+### Changed
+- Data view shows Start and End as MM/DD/YYYY
+- The Excel template has Description and Updates columns, after Title and Notes
+
+### Fixed
+- Insert row above and Insert row below put the new row next to the selected row. They added it at the end when the selected row came from the loaded file. The row order is saved, and one undo removes the new row
+- In the Milestones view, Insert above or below gives the new row the selected milestone's date, so it lands beside it
+- A new row with no dates no longer stops the timeline from drawing. With rows packed, the timeline stayed blank until the row had a date
+
 ## [4.15.1] - 2026-10-28
 
 ### Changed

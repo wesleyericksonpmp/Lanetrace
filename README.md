@@ -6,7 +6,7 @@ One HTML file. Excel in, steering-committee visuals out. No server, no login, no
 
 Lanetrace turns a spreadsheet into a swimlane timeline for a project, program or portfolio. It runs in any modern browser, and your data never leaves it.
 
-**Version 4.15.1.** [Download lanetrace.html](public/lanetrace.html), open it, and the sample plan loads. See the [changelog](CHANGELOG.md) for what's new.
+**Version 4.16.0.** [Download lanetrace.html](public/lanetrace.html), open it, and the sample plan loads. See the [changelog](CHANGELOG.md) for what's new.
 
 ![The Lanetrace timeline for the Customer Portal Launch sample: color-coded swimlanes, phases, tasks and milestones across nine months](assets/screenshots/timeline.png)
 
@@ -75,14 +75,14 @@ It takes cues from Office Timeline (now Lucen), Microsoft Project, Microsoft Pla
 
 ### Data View
 - Inline cell editing with dropdowns and suggestions
-- List or By swimlane layout. By swimlane groups sub-swimlanes too, and a row dragged onto another group moves there
+- List, By swimlane or Milestones layout. By swimlane groups sub-swimlanes too, and a row dragged onto another group moves there. Milestones lists milestones, events and decisions by date
 - New item opens the same item form the timeline uses
 - Quick look column: open the item, preview notes, row menu
 - Column reordering, custom columns and filters by swimlane, item type and visibility
 - Data checks flag unreadable dates and missing fields
 - Depends on column: list the Row IDs that must finish first. Lanetrace flags items that start before a predecessor finishes, unknown IDs and loops, and the status update names work waiting on late items
 
-**The item form.** Title, type, owner and swimlane first, then schedule, dependencies, Markdown notes and appearance options.
+**The item form.** Title, description, type, owner and swimlane first, then schedule, dependencies, Markdown notes, a running Updates log and appearance options. Each update is saved with its date and time, newest first.
 
 ![The item form open on API Development](assets/screenshots/item-form.png)
 
