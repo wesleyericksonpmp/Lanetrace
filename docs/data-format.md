@@ -47,7 +47,7 @@ Microsoft Project exports are not tested.
 | Owner | TaskOwner | Text | (blank) | Person or team responsible |
 | Depends on | DependsOn | Text | (blank) | Row IDs of items that must finish before this one starts, separated by commas, semicolons or spaces (e.g., `3, 5`). Finish-to-start only. Lanetrace flags an item that starts before a predecessor finishes (the same day is fine), IDs that match no row, self-references and loops. It never moves dates. |
 | Notes | Notes | Text | (blank) | Free text, supports Markdown |
-| Updates | Updates | Text | (blank) | Running status log, newest first. Each entry starts with its date and time in brackets, one per line: `[10/29/2026 2:05 PM] Vendor confirmed the SFTP account`. Lanetrace adds new entries with the stamp; text without stamps reads as one entry |
+| Updates | Updates | Text | (blank) | Running status log, newest first. Each entry starts with its date and time in brackets, one per line: `[10/29/2026 2:05 PM] Vendor confirmed the SFTP account`. A date alone, like `[10/28/2026]`, also counts as a stamp. Lanetrace adds new entries with the date and time; text without stamps reads as one entry |
 | Item Type | ItemType | Text | Auto | Task/Phase/Milestone/Event/Decision |
 | Label Position | LabelPosition | Text | Auto | Auto/Above/Below/Left/Right/Inside (any case) |
 | Milestone Shape | MilestoneShape | Text | (type default) | diamond, diamond-tall, circle, triangle-right, triangle-down, triangle-down-large, star, flag (any case) |

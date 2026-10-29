@@ -7306,8 +7306,9 @@ function renderCellDisplay(r, col) {
   if (col.field === 'RowID' && text.length > 12) return `<div class="cell" tabindex="0" title="${escapeHtml(text)}">${escapeHtml(text)}</div>`;
   return `<div class="cell" tabindex="0">${escapeHtml(text)}</div>`;
 }
-// v4.16: Updates is a running log, newest first. Each entry starts with its date and time in brackets.
-const UPDATE_STAMP = /^\[(\d{1,2}\/\d{1,2}\/\d{4} \d{1,2}:\d{2} [AP]M)\] ?/;
+// v4.16: Updates is a running log, newest first. Each entry starts with its date and time in brackets;
+// a date alone ([10/28/2026]) also reads as a stamp, for logs copied from a dated report
+const UPDATE_STAMP = /^\[(\d{1,2}\/\d{1,2}\/\d{4}(?: \d{1,2}:\d{2} [AP]M)?)\] ?/;
 function updateStamp(d = new Date()) {
   const h = d.getHours();
   return `${fmtNum(d)} ${h % 12 || 12}:${String(d.getMinutes()).padStart(2, '0')} ${h < 12 ? 'AM' : 'PM'}`;

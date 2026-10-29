@@ -11,7 +11,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 - Description field: what an item covers, such as scope, deliverables and definition of done. It sits under the title in the item form and the tooltip, has its own Data view column, and loads and exports as a Description column in Excel and CSV. Planner's Description now loads here instead of into Notes
-- Updates field, a running status log. Type an update in the item form or in the Data view's Updates cell, and Lanetrace adds it to the top with the date and time, like SharePoint's Append changes. The item form lists earlier updates under the box, the Data view shows the latest one, and the tooltip and status update show the latest entry. Excel and CSV keep the whole log in one Updates cell, newest first, one entry per line starting with the stamp in brackets: [10/29/2026 2:05 PM] Vendor confirmed the SFTP account
+- Updates field, a running status log. Type an update in the item form or in the Data view's Updates cell, and Lanetrace adds it to the top with the date and time, like SharePoint's Append changes. The item form lists earlier updates under the box, the Data view shows the latest one, and the tooltip and status update show the latest entry. Excel and CSV keep the whole log in one Updates cell, newest first, one entry per line starting with the stamp in brackets: [10/29/2026 2:05 PM] Vendor confirmed the SFTP account. A date alone, like [10/28/2026], also reads as a stamp
 - Milestones view in the Data view, next to List and By swimlane. It lists milestones, events and decisions by date, hides Start and Bar Style, and calls End "Date"
 - Expand button in the Notes toolbar widens the item form and gives Notes most of the window
 
