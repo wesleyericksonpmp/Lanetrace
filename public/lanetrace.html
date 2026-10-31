@@ -439,7 +439,16 @@ body[data-layout="centered"] main { padding-inline:max(32px, calc((100vw - 1600p
 [data-theme="dark"] .sandbox-msg a { color:#fbbf24 }
 .sandbox-close { background:none; border:none; font-size:20px; cursor:pointer; padding:0 4px; color:#92400e }
 [data-theme="dark"] .sandbox-close { color:#fbbf24 }
-body.has-sandbox-banner header { margin-top:44px }
+.sandbox-banner .sp-btn { flex-shrink:0 }
+/* v4.16.1: bars stack under one another; layoutNoticeBars sets top and body padding */
+#sync-gate { position:fixed; inset:0; z-index:280; background:rgba(16,24,40,.28) }
+#sync-gate[hidden] { display:none }
+.plan-offer { position:fixed; left:0; right:0; z-index:300; display:flex; align-items:center; gap:12px;
+  padding:10px 16px; background:color-mix(in srgb, var(--blue) 10%, var(--card));
+  border-bottom:1px solid var(--border); font-size:13px }
+.plan-offer .sp-btn, .plan-offer .sandbox-close { flex-shrink:0 }
+#sync-banner-folder:empty { display:none }
+#sync-banner-folder { display:block; font-size:12px; margin-top:2px }
 #toast { position:fixed; left:50%; bottom:24px; transform:translateX(-50%) translateY(20px); z-index:220;
   padding:10px 16px; background:var(--card); border:1px solid var(--border); border-radius:3px;
   box-shadow:none; font-size:13px; opacity:0; transition:all 200ms;
@@ -606,7 +615,9 @@ body.has-sandbox-banner header { margin-top:44px }
 /* print stylesheet */
 @media print {
   header .controls, #settings-panel, #sp-backdrop, #tt, #modal-back, #palette-back,
-  #dropzone, #toast, #help-modal, #status-modal, #tl .tl-ui, .view-tabs, #issues-pop, #choice-back, .empty-layer { display:none !important }
+  #dropzone, #toast, #help-modal, #status-modal, #tl .tl-ui, .view-tabs, #issues-pop, #choice-back, .empty-layer,
+  #sandbox-banner, #sync-banner, #sync-gate, #plan-offer { display:none !important }
+  body { padding-top:0 !important }
   .chart-card.has-empty { min-height:0 }
   html, body { background:#fff !important }
   /* v4.13: the timeline prints at its full width and was cut off at the right edge; scale it to the page */
@@ -783,6 +794,22 @@ body.has-sandbox-banner header { margin-top:44px }
   <span class="sandbox-msg"><strong>Limited mode:</strong> SharePoint's preview blocks downloads, printing and saving, so edits made here aren't saved.
     To use everything: click <strong>⋯ → Download</strong> in SharePoint, then open the downloaded file.</span>
   <button id="sandbox-dismiss" class="sandbox-close" aria-label="Dismiss">×</button>
+</div>
+
+<div id="sync-banner" class="sandbox-banner" style="display:none" role="alert">
+  <span class="sandbox-icon" aria-hidden="true">⚠</span>
+  <span class="sandbox-msg">
+    <span id="sync-banner-msg"></span>
+    <span id="sync-banner-folder"></span>
+  </span>
+  <button type="button" class="sp-btn" id="sync-banner-sample">Continue with the sample</button>
+  <button type="button" class="sp-btn primary" id="sync-banner-reconnect">Reconnect</button>
+</div>
+<div id="sync-gate" hidden></div>
+<div id="plan-offer" class="plan-offer" style="display:none" role="status">
+  <span id="plan-offer-msg" style="flex:1"></span>
+  <button type="button" class="sp-btn primary" id="plan-offer-load">Load plan from this folder</button>
+  <button type="button" class="sandbox-close" id="plan-offer-dismiss" aria-label="Dismiss">×</button>
 </div>
 
 <header>
@@ -1043,8 +1070,11 @@ body.has-sandbox-banner header { margin-top:44px }
       <div class="sp-row" style="gap:6px;flex-wrap:wrap" id="sp-sync-actions"></div>
       <div class="sp-hint" id="sp-sync-hint">
         Pick a folder (OneDrive, network share, etc.) to autosave your setup as
-        <span style="font-family:ui-monospace,Consolas,monospace">program-timeline.state.json</span>.
-        Reopens automatically on next visit. Only in Chromium browsers (Edge, Chrome).
+        <span style="font-family:ui-monospace,Consolas,monospace">program-timeline.state.json</span>
+        and your rows as
+        <span style="font-family:ui-monospace,Consolas,monospace">program-timeline.data.xlsx</span>.
+        Reopens automatically on the next visit in Edge or Chrome.
+        Putting the HTML and an Excel file in the same folder is not enough: link the folder here, or load the Excel file again each time.
       </div>
     </div>
 
@@ -2124,7 +2154,7 @@ const LAYOUT = {
 };
 
 // ── settings (persisted) ─────────────────────────────────────────────────
-const PREVIEW_VERSION = 'v4.16.0';
+const PREVIEW_VERSION = 'v4.16.1';
 const SETTINGS_DEFAULTS = {
   theme: 'auto',
   themePack: 'corporate-blue',
@@ -5276,6 +5306,9 @@ async function handleFile(file, opts = {}) {
     if (!opts.fromSyncFolder) await confirmEditsForNewFile(rows, file.name);
     DATA_ROWS = rows;
     LOADED_FILE_NAME = file.name;
+    SESSION_TOUCHED = true;
+    PLAN_OFFER = null;
+    renderSyncBanner();
     // v4.15: columns brought in by an earlier import go; this file's come in below
     CUSTOM_COLUMNS = CUSTOM_COLUMNS.filter(c => !c.field.startsWith('Import_'));
     if (loaded.mapped) {   // a mapped Planner, Smartsheet or other export
@@ -5299,6 +5332,7 @@ async function handleFile(file, opts = {}) {
     syncSettingsUi();
     render();
     // cache a copy in the sync folder for auto-reload next session
+    let cacheWriteError = null;
     if (SYNC_DIR && !opts.fromSyncFolder) {
       try {
         // the cache is always .xlsx, so a CSV or a mapped export is stored as the Excel template filled with its rows
@@ -5306,7 +5340,10 @@ async function handleFile(file, opts = {}) {
         const fh = await SYNC_DIR.getFileHandle(DATA_CACHE_FILE, { create: true });
         const s = await fh.createWritable();
         await s.write(buf); await s.close();
-      } catch (e) { console.warn('Data cache write failed:', e); }
+      } catch (e) {
+        console.warn('Data cache write failed:', e);
+        cacheWriteError = e;
+      }
     }
     fsWriteState();
     if (FS_SUPPORTED && !SYNC_STATUS.linked) {
@@ -5314,7 +5351,11 @@ async function handleFile(file, opts = {}) {
       // v4.15: after a mapped load, wait until its message (hidden rows, Change mapping) has had its time
       if (!seen) setTimeout(() => toast('Tip: link a sync folder in Settings > Data & sync to keep your edits if browser data is cleared, or to use them on another computer.', '', 9000), loaded.mapped ? 9500 : 2500);
     }
-    if (warnings.length) toast(`Loaded ${rows.length} rows from ${file.name}. ${warnings.join(' ')}`, 'err', 8000);
+    // v4.16.1: a locked OneDrive or Excel file used to fail only in the console, then the success toast hid it
+    if (cacheWriteError) {
+      const why = cacheWriteError.message || String(cacheWriteError);
+      toast(`Loaded ${rows.length} rows from ${file.name}, but could not write ${DATA_CACHE_FILE}: ${why}. If Excel or OneDrive has the file open, close it and try again.`, 'err', 9000);
+    } else if (warnings.length) toast(`Loaded ${rows.length} rows from ${file.name}. ${warnings.join(' ')}`, 'err', 8000);
     else if (loaded.mapped) toast([`Loaded ${rows.length} rows from ${file.name}.`, ...loaded.notes].join(' '), '', 9000,
       { label: 'Change mapping', run: () => handleFile(LAST_IMPORT_FILE, { remap: true }) });
     else toast(`Loaded ${rows.length} rows from ${file.name}`);
@@ -5911,6 +5952,7 @@ document.getElementById('sp-reset-data').addEventListener('click', () => {
   LOADED_FILE_NAME = '';
   applySettings(); syncSettingsUi(); render();
   toast('Restored built-in sample');
+  offerPlanFromFolder();
 });
 
 // drag-drop anywhere on the page
@@ -5932,7 +5974,10 @@ const STATE_FILE       = 'program-timeline.state.json';
 const DATA_CACHE_FILE  = 'program-timeline.data.xlsx';
 const FS_SUPPORTED     = 'showDirectoryPicker' in window;
 let SYNC_DIR    = null;    // FileSystemDirectoryHandle
-let SYNC_STATUS = { linked:false, dirName:'', lastSaved:'', needsPermission:false };
+let SYNC_STATUS = { linked:false, dirName:'', lastSaved:'', needsPermission:false, readOnly:false, restoredData:false };
+let PLAN_OFFER = null;     // spreadsheet found in the linked folder or beside this HTML, not loaded yet
+let SYNC_GATE_OPEN = true; // the sample stays covered until Reconnect or an explicit continue
+let SESSION_TOUCHED = false; // a file was loaded this visit; reconnect must not replace it with the sample path
 
 // tiny IDB kv store (stores the directory handle across sessions)
 function idbOpen() {
@@ -6012,6 +6057,19 @@ function renderSyncUi() {
   bind('btn-open-here',   () => toast('Open your file explorer to the folder — browsers cannot open Explorer directly.'));
 }
 
+// v4.16.1: 'readwrite' when saves will work, 'read' when the sidecars can be restored without a new prompt,
+// 'prompt' when the browser is waiting for Reconnect. queryPermission does not show a dialog.
+async function fsQueryMode(handle) {
+  let write = 'prompt';
+  try { write = await handle.queryPermission({ mode: 'readwrite' }); } catch (e) { console.warn('queryPermission readwrite failed:', e); }
+  if (write === 'granted') return 'readwrite';
+  try {
+    const read = await handle.queryPermission({ mode: 'read' });
+    if (read === 'granted') return 'read';
+  } catch (_) { /* a browser that only reports readwrite leaves the handle needing a reconnect */ }
+  return 'prompt';
+}
+
 async function fsBoot() {
   if (!FS_SUPPORTED) return;
   try {
@@ -6020,20 +6078,28 @@ async function fsBoot() {
     SYNC_DIR = handle;
     SYNC_STATUS.linked = true;
     SYNC_STATUS.dirName = handle.name;
-    const perm = await handle.queryPermission({ mode: 'readwrite' });
-    if (perm !== 'granted') {
+    const mode = await fsQueryMode(handle);
+    if (mode === 'prompt') {
+      // Do not read here: getFileHandle would throw, and the sample would look like the saved plan.
       SYNC_STATUS.needsPermission = true;
-      return;   // will show a Reconnect button
+      SYNC_STATUS.readOnly = false;
+      return;
     }
     if (!(await fsFolderExists(handle))) { await fsForgetMissing(handle.name); return; }
-    await fsRestoreFromDisk();
+    const restored = await fsRestoreFromDisk();
+    SYNC_STATUS.restoredData = !!(restored && restored.hadData);
+    SYNC_STATUS.restoredState = !!(restored && restored.hadState);
+    if (mode === 'read') {
+      SYNC_STATUS.needsPermission = true;
+      SYNC_STATUS.readOnly = true;
+    }
   } catch (e) { console.warn('fsBoot failed:', e); }
 }
 
-// Returns true if a state file was found and loaded, false otherwise.
+// hadState: settings sidecar was applied. hadData: program-timeline.data.xlsx replaced the sample.
 async function fsRestoreFromDisk() {
-  if (!SYNC_DIR) return false;
-  let hadState = false;
+  if (!SYNC_DIR) return { hadState: false, hadData: false };
+  let hadState = false, hadData = false;
   try {
     const fh = await SYNC_DIR.getFileHandle(STATE_FILE);
     const txt = await (await fh.getFile()).text();
@@ -6052,11 +6118,11 @@ async function fsRestoreFromDisk() {
     const dh = await SYNC_DIR.getFileHandle(DATA_CACHE_FILE);
     const df = await dh.getFile();
     const { rows } = await loadXlsx(df);
-    if (rows.length) { DATA_ROWS = rows; LOADED_FILE_NAME = df.name; }
+    if (rows.length) { DATA_ROWS = rows; LOADED_FILE_NAME = df.name; hadData = true; }
   } catch (e) {
     if (e.name !== 'NotFoundError') console.warn('Data cache read failed:', e);
   }
-  return hadState;
+  return { hadState, hadData };
 }
 
 async function fsPickFolder() {
@@ -6064,14 +6130,17 @@ async function fsPickFolder() {
   try {
     const handle = await window.showDirectoryPicker({ mode: 'readwrite' });
     SYNC_DIR = handle;
-    SYNC_STATUS = { linked:true, dirName:handle.name, lastSaved:'', needsPermission:false };
+    SYNC_STATUS = { linked:true, dirName:handle.name, lastSaved:'', needsPermission:false, readOnly:false, restoredData:false };
     await idbSet('sync-dir', handle);
     // load pre-existing state file if the folder already has one; otherwise seed one
-    const hadState = await fsRestoreFromDisk();
-    if (!hadState) await fsWriteStateNow();
+    const restored = await fsRestoreFromDisk() || { hadState: false, hadData: false };
+    SYNC_STATUS.restoredData = !!restored.hadData;
+    if (!restored.hadState) await fsWriteStateNow();
     applySettings(); syncSettingsUi(); render();
     renderSyncUi();
-    toast(hadState ? `Reloaded state from ${handle.name}` : `Sync folder set: ${handle.name}`);
+    renderSyncBanner();
+    toast(restored.hadState ? `Reloaded state from ${handle.name}` : `Sync folder set: ${handle.name}`);
+    if (!restored.hadData) offerPlanFromFolder();
   } catch (e) {
     if (e.name !== 'AbortError') toast('Could not link folder: ' + e.message, 'err');
   }
@@ -6084,9 +6153,10 @@ async function fsFolderExists(handle) {
 }
 async function fsForgetMissing(name) {
   SYNC_DIR = null;
-  SYNC_STATUS = { linked:false, dirName:'', lastSaved:'', needsPermission:false };
+  SYNC_STATUS = { linked:false, dirName:'', lastSaved:'', needsPermission:false, readOnly:false, restoredData:false };
   try { await idbDel('sync-dir'); } catch (_) {}
   renderSyncUi();
+  renderSyncBanner();
   toast(`The sync folder "${name}" can no longer be found, so it was unlinked. Choose a folder in Settings > Data & sync.`, 'err', 8000);
 }
 
@@ -6096,11 +6166,21 @@ async function fsRequestPermission() {
     const perm = await SYNC_DIR.requestPermission({ mode: 'readwrite' });
     if (perm === 'granted' && !(await fsFolderExists(SYNC_DIR))) { await fsForgetMissing(SYNC_DIR.name); return; }
     if (perm === 'granted') {
+      // A read-only restore already applied the sidecars. Reading them again would drop edits made since.
+      const keepSession = SESSION_TOUCHED || (SYNC_STATUS.readOnly && (SYNC_STATUS.restoredData || SYNC_STATUS.restoredState));
       SYNC_STATUS.needsPermission = false;
-      await fsRestoreFromDisk();
+      SYNC_STATUS.readOnly = false;
+      if (!keepSession) {
+        const restored = await fsRestoreFromDisk();
+        SYNC_STATUS.restoredData = !!(restored && restored.hadData);
+        SYNC_STATUS.restoredState = !!(restored && restored.hadState);
+      }
       applySettings(); syncSettingsUi(); render();
       renderSyncUi();
+      renderSyncBanner();
       toast('Sync folder reconnected');
+      if (keepSession) await fsWriteStateNow();
+      if (!LOADED_FILE_NAME) offerPlanFromFolder();
     } else {
       toast('Permission denied', 'err');
     }
@@ -6110,11 +6190,221 @@ async function fsRequestPermission() {
 async function fsDisconnect() {
   if (!await askConfirm('Disconnect the sync folder?', 'Your files stay in place. Only the link from this browser is removed.', 'Disconnect')) return;
   SYNC_DIR = null;
-  SYNC_STATUS = { linked:false, dirName:'', lastSaved:'', needsPermission:false };
+  SYNC_STATUS = { linked:false, dirName:'', lastSaved:'', needsPermission:false, readOnly:false, restoredData:false };
   try { await idbDel('sync-dir'); } catch (_) {}
   renderSyncUi();
+  renderSyncBanner();
   toast('Disconnected from sync folder');
 }
+
+// v4.16.1: fixed notices stack. The permission bar covers the page so the sample is not the plan.
+const SYNC_GATE_ROOTS = ['header', 'main', '#settings-panel', '#more-menu', '#sp-backdrop'];
+function layoutNoticeBars() {
+  let y = 0;
+  ['sandbox-banner', 'sync-banner', 'plan-offer'].forEach(id => {
+    const el = document.getElementById(id);
+    if (!el || el.style.display === 'none') return;
+    el.style.top = y + 'px';
+    y += el.offsetHeight;
+  });
+  document.body.style.paddingTop = y ? y + 'px' : '';
+}
+function renderSyncBanner() {
+  const bar = document.getElementById('sync-banner');
+  const gate = document.getElementById('sync-gate');
+  const sampleBtn = document.getElementById('sync-banner-sample');
+  if (!bar || !gate) return;
+  const show = !!(SYNC_STATUS.linked && SYNC_STATUS.needsPermission);
+  if (!show) {
+    bar.style.display = 'none';
+    gate.hidden = true;
+    SYNC_GATE_ROOTS.forEach(sel => { const el = document.querySelector(sel); if (el) el.inert = false; });
+  } else {
+    const folder = SYNC_STATUS.dirName || 'the linked folder';
+    const msg = document.getElementById('sync-banner-msg');
+    const folderEl = document.getElementById('sync-banner-folder');
+    bar.style.display = 'flex';
+    if (SYNC_STATUS.restoredData || LOADED_FILE_NAME) {
+      msg.textContent = SYNC_STATUS.restoredData
+        ? `Loaded your plan from ${folder} read-only. Click Reconnect to save changes.`
+        : `Your plan is loaded. Click Reconnect to save changes to ${folder}.`;
+      folderEl.textContent = '';
+      sampleBtn.hidden = true;
+      gate.hidden = true;
+    } else if (SYNC_GATE_OPEN) {
+      msg.textContent = 'Your plan is in this folder — click Reconnect to load it.';
+      folderEl.textContent = `Folder: ${folder}`;
+      sampleBtn.hidden = false;
+      gate.hidden = false;
+    } else {
+      msg.textContent = 'Showing the built-in sample. Your plan is in this folder — click Reconnect to load it.';
+      folderEl.textContent = `Folder: ${folder}`;
+      sampleBtn.hidden = true;
+      gate.hidden = true;
+    }
+    const block = !gate.hidden;
+    SYNC_GATE_ROOTS.forEach(sel => { const el = document.querySelector(sel); if (el) el.inert = block; });
+    if (block) {
+      const btn = document.getElementById('sync-banner-reconnect');
+      if (btn && document.activeElement === document.body) btn.focus();
+    }
+  }
+  if (LOADED_FILE_NAME) PLAN_OFFER = null;
+  renderPlanOffer();
+}
+
+// A blank template download is not a plan. Excel's lock file (~$name.xlsx) is not one either.
+function pickPlanFile(names) {
+  const xlsx = (names || []).filter(n => {
+    const base = String(n).split(/[/\\]/).pop();
+    if (!/\.xlsx$/i.test(base) || base.startsWith('~$')) return false;
+    if (base.toLowerCase() === 'lanetrace-template.xlsx') return false;
+    return true;
+  });
+  const cache = xlsx.find(n => n.toLowerCase() === DATA_CACHE_FILE.toLowerCase());
+  if (cache) return { name: cache, kind: 'cache' };
+  if (xlsx.length === 1) return { name: xlsx[0], kind: 'schedule' };
+  return null;
+}
+async function listDirNames(dir) {
+  const names = [];
+  try { for await (const name of dir.keys()) names.push(name); }
+  catch (e) { console.warn('Could not list sync folder:', e); return null; }
+  return names;
+}
+function siblingUrl(name) {
+  if (!name || /[\\/]/.test(name) || name === '.' || name === '..') return null;
+  try {
+    const base = new URL('./', location.href);
+    const url = new URL(name, base);
+    if (url.href.indexOf(base.href) !== 0) return null;
+    if (/[\\/]/.test(decodeURIComponent(url.href.slice(base.href.length)))) return null;
+    return url;
+  } catch (_) { return null; }
+}
+async function siblingFileExists(name) {
+  const url = siblingUrl(name);
+  if (!url) return false;
+  try {
+    let res = await fetch(url, { method: 'HEAD' });
+    if (res.status === 405 || res.status === 501) res = await fetch(url);
+    if (!res.ok) return false;
+    const type = (res.headers.get('content-type') || '').toLowerCase();
+    if (type.includes('text/html')) return false;
+    return true;
+  } catch (_) { return false; }
+}
+async function fetchSiblingNames() {
+  try {
+    const res = await fetch(new URL('./', location.href));
+    if (!res.ok) return null;
+    const type = (res.headers.get('content-type') || '').toLowerCase();
+    const text = await res.text();
+    if (!type.includes('html') && !/<a\s/i.test(text)) return null;
+    const names = new Set();
+    const re = /href\s*=\s*["']([^"'#?]+)/gi;
+    let m;
+    while ((m = re.exec(text))) {
+      let href = m[1];
+      try { href = decodeURIComponent(href); } catch (_) {}
+      const base = href.split(/[/\\]/).pop();
+      if (base && base === href && /\.xlsx$/i.test(base)) names.add(base);
+    }
+    return [...names];
+  } catch (_) { return null; }
+}
+function planOfferDismissed(key) {
+  try { return sessionStorage.getItem('lanetrace-plan-offer') === key; } catch (_) { return false; }
+}
+async function findPlanCandidate() {
+  if (SYNC_DIR && (!SYNC_STATUS.needsPermission || SYNC_STATUS.readOnly)) {
+    const names = await listDirNames(SYNC_DIR);
+    const pick = names && pickPlanFile(names);
+    if (pick) {
+      const key = 'sync:' + pick.name.toLowerCase();
+      if (planOfferDismissed(key)) return null;
+      return { ...pick, dir: SYNC_DIR, where: SYNC_STATUS.dirName || 'This folder', key };
+    }
+  }
+  const listed = await fetchSiblingNames();
+  const fromList = listed && pickPlanFile(listed);
+  if (fromList) {
+    const key = 'sib:' + fromList.name.toLowerCase();
+    if (!planOfferDismissed(key)) return { ...fromList, where: 'This folder', key, sibling: true };
+    return null;
+  }
+  if (await siblingFileExists(DATA_CACHE_FILE)) {
+    const key = 'sib:' + DATA_CACHE_FILE.toLowerCase();
+    if (!planOfferDismissed(key)) return { name: DATA_CACHE_FILE, kind: 'cache', where: 'This folder', key, sibling: true };
+  }
+  return null;
+}
+function renderPlanOffer() {
+  const el = document.getElementById('plan-offer');
+  const gate = document.getElementById('sync-gate');
+  if (!el) return;
+  if (!PLAN_OFFER || (gate && !gate.hidden)) {
+    el.style.display = 'none';
+    layoutNoticeBars();
+    return;
+  }
+  const name = PLAN_OFFER.name;
+  const where = PLAN_OFFER.where || 'This folder';
+  document.getElementById('plan-offer-msg').textContent = PLAN_OFFER.kind === 'cache'
+    ? `${where} has ${DATA_CACHE_FILE}.`
+    : `${where} has one spreadsheet, ${name}.`;
+  el.style.display = 'flex';
+  layoutNoticeBars();
+}
+async function offerPlanFromFolder() {
+  if (LOADED_FILE_NAME) { PLAN_OFFER = null; renderPlanOffer(); return; }
+  // The reconnect banner already explains where the plan is. A second offer would compete with it.
+  if (SYNC_STATUS.needsPermission) { PLAN_OFFER = null; renderPlanOffer(); return; }
+  const gate = document.getElementById('sync-gate');
+  if (gate && !gate.hidden) return;
+  try { PLAN_OFFER = await findPlanCandidate(); }
+  catch (e) { console.warn('Plan folder probe failed:', e); PLAN_OFFER = null; }
+  renderPlanOffer();
+}
+async function loadPlanOffer() {
+  const offer = PLAN_OFFER;
+  if (!offer) return;
+  const btn = document.getElementById('plan-offer-load');
+  if (btn) btn.disabled = true;
+  try {
+    let file = null;
+    if (offer.dir) {
+      const fh = await offer.dir.getFileHandle(offer.name);
+      file = await fh.getFile();
+    } else if (offer.sibling) {
+      const url = siblingUrl(offer.name);
+      const res = url && await fetch(url);
+      if (!res || !res.ok) throw new Error('Could not read ' + offer.name);
+      file = new File([await res.arrayBuffer()], offer.name, { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
+    }
+    if (!file) throw new Error('Could not read ' + offer.name);
+    const fromSync = !!(offer.dir && offer.kind === 'cache');
+    await handleFile(file, { fromSyncFolder: fromSync });
+    if (LOADED_FILE_NAME) { PLAN_OFFER = null; renderPlanOffer(); }
+  } catch (e) {
+    toast('Could not load the plan: ' + (e.message || e), 'err');
+  } finally {
+    if (btn) btn.disabled = false;
+  }
+}
+document.getElementById('sync-banner-reconnect').addEventListener('click', () => fsRequestPermission());
+document.getElementById('sync-banner-sample').addEventListener('click', () => {
+  SYNC_GATE_OPEN = false;
+  renderSyncBanner();
+  offerPlanFromFolder();
+});
+document.getElementById('plan-offer-load').addEventListener('click', () => loadPlanOffer());
+document.getElementById('plan-offer-dismiss').addEventListener('click', () => {
+  if (PLAN_OFFER) { try { sessionStorage.setItem('lanetrace-plan-offer', PLAN_OFFER.key); } catch (_) {} }
+  PLAN_OFFER = null;
+  renderPlanOffer();
+});
+window.addEventListener('resize', () => layoutNoticeBars());
 
 let fsWriteTimer = 0;
 function fsWriteState() {
@@ -8561,6 +8851,7 @@ function renderMarkdown(text) {
   applySettings();
   syncSettingsUi();
   renderSyncUi();
+  renderSyncBanner();
   // v4.0 UI wiring — must happen before first render so the tabs / title / buttons exist
   initEditableTitle();
   initViewTabs();
@@ -8577,6 +8868,7 @@ function renderMarkdown(text) {
   render();
   updateHistoryButtons();
   pushHistory();                // seed history with the current state
+  await offerPlanFromFolder();  // v4.16.1: a plan already in the linked folder, or beside this HTML
 
   // v4.4.0: Detect SharePoint sandbox and show warning banner
   (async function detectSandbox() {
@@ -8611,11 +8903,13 @@ function renderMarkdown(text) {
       const banner = document.getElementById('sandbox-banner');
       banner.style.display = 'flex';
       document.body.classList.add('has-sandbox-banner');
+      layoutNoticeBars();
 
       // Dismiss button
       document.getElementById('sandbox-dismiss').addEventListener('click', () => {
         banner.style.display = 'none';
         document.body.classList.remove('has-sandbox-banner');
+        layoutNoticeBars();
       });
     }
   })();

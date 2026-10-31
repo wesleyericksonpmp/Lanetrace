@@ -7,6 +7,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [4.16.1] - 2026-10-31
+
+### Added
+- When the linked folder, or the folder next to the HTML, already has `program-timeline.data.xlsx` or a single spreadsheet, Lanetrace offers **Load plan from this folder**
+
+### Fixed
+- Reopening Lanetrace when the browser needs permission for the linked folder no longer leaves the built-in sample looking like your plan. A banner says the plan is in that folder and asks you to reconnect. If the browser still allows a read, the saved plan loads before that reconnect
+- Saving `program-timeline.data.xlsx` now reports a failure, such as a file OneDrive or Excel has locked. It used to be only a console warning
+
 ## [4.16.0] - 2026-10-29
 
 ### Added

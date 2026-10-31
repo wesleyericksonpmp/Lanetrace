@@ -80,6 +80,7 @@ If you store lanetrace.html in a OneDrive-synced folder:
 2. Open it locally for full functionality
 3. Changes to the HTML file itself sync back to OneDrive
 4. Overlay edits (localStorage) are browser-local only
+5. Putting the HTML and an Excel file in that folder does not load the plan. Link the folder in Settings → Data & sync, or load the Excel file again each time
 
 ### Sync Folder Feature
 
