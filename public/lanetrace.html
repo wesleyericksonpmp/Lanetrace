@@ -5333,13 +5333,12 @@ async function handleFile(file, opts = {}) {
     render();
     // cache a copy in the sync folder for auto-reload next session
     let cacheWriteError = null;
-    if (SYNC_DIR && !opts.fromSyncFolder) {
+    if (opts.fromSyncFolder) PENDING_CACHE = null;
+    else if (SYNC_DIR) {
       try {
         // the cache is always .xlsx, so a CSV or a mapped export is stored as the Excel template filled with its rows
         const buf = isCsv || loaded.mapped ? generateXlsxTemplate({ rows: exportTable(rows).rows, extraColumns: [], creator: 'Lanetrace' }) : await file.arrayBuffer();
-        const fh = await SYNC_DIR.getFileHandle(DATA_CACHE_FILE, { create: true });
-        const s = await fh.createWritable();
-        await s.write(buf); await s.close();
+        cacheWriteError = await fsWriteCacheBuf(buf);
       } catch (e) {
         console.warn('Data cache write failed:', e);
         cacheWriteError = e;
@@ -5950,7 +5949,12 @@ document.getElementById('sp-file-input').addEventListener('change', ev => {
 document.getElementById('sp-reset-data').addEventListener('click', () => {
   DATA_ROWS = DATA.slice();
   LOADED_FILE_NAME = '';
+  PENDING_CACHE = null;
+  // The plan-loaded banner had the gate hidden while SYNC_GATE_OPEN was still true.
+  // Clearing the file must not cover the sample the person just asked for.
+  if (SYNC_STATUS.needsPermission) SYNC_GATE_OPEN = false;
   applySettings(); syncSettingsUi(); render();
+  renderSyncBanner();
   toast('Restored built-in sample');
   offerPlanFromFolder();
 });
@@ -5974,8 +5978,9 @@ const STATE_FILE       = 'program-timeline.state.json';
 const DATA_CACHE_FILE  = 'program-timeline.data.xlsx';
 const FS_SUPPORTED     = 'showDirectoryPicker' in window;
 let SYNC_DIR    = null;    // FileSystemDirectoryHandle
-let SYNC_STATUS = { linked:false, dirName:'', lastSaved:'', needsPermission:false, readOnly:false, restoredData:false };
+let SYNC_STATUS = { linked:false, dirName:'', lastSaved:'', needsPermission:false, readOnly:false, restoredData:false, restoredState:false };
 let PLAN_OFFER = null;     // spreadsheet found in the linked folder or beside this HTML, not loaded yet
+let PENDING_CACHE = null;  // xlsx bytes waiting for write permission on the linked folder
 let SYNC_GATE_OPEN = true; // the sample stays covered until Reconnect or an explicit continue
 let SESSION_TOUCHED = false; // a file was loaded this visit; reconnect must not replace it with the sample path
 
@@ -6129,12 +6134,14 @@ async function fsPickFolder() {
   if (!FS_SUPPORTED) { toast('Not supported in this browser', 'err'); return; }
   try {
     const handle = await window.showDirectoryPicker({ mode: 'readwrite' });
+    PENDING_CACHE = null;
     SYNC_DIR = handle;
-    SYNC_STATUS = { linked:true, dirName:handle.name, lastSaved:'', needsPermission:false, readOnly:false, restoredData:false };
+    SYNC_STATUS = { linked:true, dirName:handle.name, lastSaved:'', needsPermission:false, readOnly:false, restoredData:false, restoredState:false };
     await idbSet('sync-dir', handle);
     // load pre-existing state file if the folder already has one; otherwise seed one
     const restored = await fsRestoreFromDisk() || { hadState: false, hadData: false };
     SYNC_STATUS.restoredData = !!restored.hadData;
+    SYNC_STATUS.restoredState = !!restored.hadState;
     if (!restored.hadState) await fsWriteStateNow();
     applySettings(); syncSettingsUi(); render();
     renderSyncUi();
@@ -6153,7 +6160,8 @@ async function fsFolderExists(handle) {
 }
 async function fsForgetMissing(name) {
   SYNC_DIR = null;
-  SYNC_STATUS = { linked:false, dirName:'', lastSaved:'', needsPermission:false, readOnly:false, restoredData:false };
+  PENDING_CACHE = null;
+  SYNC_STATUS = { linked:false, dirName:'', lastSaved:'', needsPermission:false, readOnly:false, restoredData:false, restoredState:false };
   try { await idbDel('sync-dir'); } catch (_) {}
   renderSyncUi();
   renderSyncBanner();
@@ -6171,6 +6179,7 @@ async function fsRequestPermission() {
       SYNC_STATUS.needsPermission = false;
       SYNC_STATUS.readOnly = false;
       if (!keepSession) {
+        PENDING_CACHE = null;
         const restored = await fsRestoreFromDisk();
         SYNC_STATUS.restoredData = !!(restored && restored.hadData);
         SYNC_STATUS.restoredState = !!(restored && restored.hadState);
@@ -6178,8 +6187,12 @@ async function fsRequestPermission() {
       applySettings(); syncSettingsUi(); render();
       renderSyncUi();
       renderSyncBanner();
-      toast('Sync folder reconnected');
-      if (keepSession) await fsWriteStateNow();
+      const cacheErr = keepSession ? await fsFlushPendingCache() : null;
+      const stateErr = keepSession ? await fsWriteStateNow() : null;
+      if (cacheErr) {
+        const why = cacheErr.message || String(cacheErr);
+        toast(`Could not write ${DATA_CACHE_FILE}: ${why}. If Excel or OneDrive has the file open, close it and try again.`, 'err', 9000);
+      } else if (!stateErr) toast('Sync folder reconnected');
       if (!LOADED_FILE_NAME) offerPlanFromFolder();
     } else {
       toast('Permission denied', 'err');
@@ -6190,7 +6203,8 @@ async function fsRequestPermission() {
 async function fsDisconnect() {
   if (!await askConfirm('Disconnect the sync folder?', 'Your files stay in place. Only the link from this browser is removed.', 'Disconnect')) return;
   SYNC_DIR = null;
-  SYNC_STATUS = { linked:false, dirName:'', lastSaved:'', needsPermission:false, readOnly:false, restoredData:false };
+  PENDING_CACHE = null;
+  SYNC_STATUS = { linked:false, dirName:'', lastSaved:'', needsPermission:false, readOnly:false, restoredData:false, restoredState:false };
   try { await idbDel('sync-dir'); } catch (_) {}
   renderSyncUi();
   renderSyncBanner();
@@ -6224,8 +6238,8 @@ function renderSyncBanner() {
     const msg = document.getElementById('sync-banner-msg');
     const folderEl = document.getElementById('sync-banner-folder');
     bar.style.display = 'flex';
-    if (SYNC_STATUS.restoredData || LOADED_FILE_NAME) {
-      msg.textContent = SYNC_STATUS.restoredData
+    if (LOADED_FILE_NAME) {
+      msg.textContent = (SYNC_STATUS.restoredData && !SESSION_TOUCHED)
         ? `Loaded your plan from ${folder} read-only. Click Reconnect to save changes.`
         : `Your plan is loaded. Click Reconnect to save changes to ${folder}.`;
       folderEl.textContent = '';
@@ -6358,12 +6372,18 @@ function renderPlanOffer() {
 }
 async function offerPlanFromFolder() {
   if (LOADED_FILE_NAME) { PLAN_OFFER = null; renderPlanOffer(); return; }
-  // The reconnect banner already explains where the plan is. A second offer would compete with it.
-  if (SYNC_STATUS.needsPermission) { PLAN_OFFER = null; renderPlanOffer(); return; }
+  // Hide a competing offer only while the reconnect gate covers the page.
+  // After Continue with the sample, still look: a sibling spreadsheet, or a read
+  // of a folder we can already read, does not need write permission.
   const gate = document.getElementById('sync-gate');
-  if (gate && !gate.hidden) return;
-  try { PLAN_OFFER = await findPlanCandidate(); }
-  catch (e) { console.warn('Plan folder probe failed:', e); PLAN_OFFER = null; }
+  if (gate && !gate.hidden) { PLAN_OFFER = null; renderPlanOffer(); return; }
+  let found = null;
+  try { found = await findPlanCandidate(); }
+  catch (e) { console.warn('Plan folder probe failed:', e); }
+  if (LOADED_FILE_NAME) { PLAN_OFFER = null; renderPlanOffer(); return; }
+  const gateNow = document.getElementById('sync-gate');
+  if (gateNow && !gateNow.hidden) { PLAN_OFFER = null; renderPlanOffer(); return; }
+  PLAN_OFFER = found;
   renderPlanOffer();
 }
 async function loadPlanOffer() {
@@ -6406,6 +6426,28 @@ document.getElementById('plan-offer-dismiss').addEventListener('click', () => {
 });
 window.addEventListener('resize', () => layoutNoticeBars());
 
+// Bytes for program-timeline.data.xlsx. Held, not written, until the folder is writable.
+async function fsWriteCacheBuf(buf) {
+  if (!SYNC_DIR) return null;
+  if (SYNC_STATUS.needsPermission) { PENDING_CACHE = buf; return null; }
+  try {
+    const fh = await SYNC_DIR.getFileHandle(DATA_CACHE_FILE, { create: true });
+    const writable = await fh.createWritable();
+    await writable.write(buf);
+    await writable.close();
+    PENDING_CACHE = null;
+    return null;
+  } catch (e) {
+    console.warn('Data cache write failed:', e);
+    PENDING_CACHE = null;
+    return e;
+  }
+}
+async function fsFlushPendingCache() {
+  if (!PENDING_CACHE) return null;
+  return fsWriteCacheBuf(PENDING_CACHE);
+}
+
 let fsWriteTimer = 0;
 function fsWriteState() {
   if (!SYNC_DIR || SYNC_STATUS.needsPermission) return;
@@ -6435,6 +6477,7 @@ async function fsWriteStateNow() {
   } catch (e) {
     console.warn('fsWriteState failed:', e);
     toast('Sync write failed: ' + e.message, 'err');
+    return e;
   }
 }
 

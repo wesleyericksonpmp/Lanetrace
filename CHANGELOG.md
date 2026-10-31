@@ -7,6 +7,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+- Continue with the sample, while the linked folder still needs permission, offers **Load plan from this folder** when a spreadsheet is beside the HTML. That offer stays hidden while the reconnect gate covers the page
+- A plan loaded before Reconnect is written into the sync folder once permission is granted. Lanetrace no longer says Excel or OneDrive has the file locked when the browser has not allowed writing yet
+- Restore sample, while the folder still needs permission, no longer says the saved plan is on screen, and it no longer covers the page with the reconnect gate
+
 ## [4.16.1] - 2026-10-31
 
 ### Added
