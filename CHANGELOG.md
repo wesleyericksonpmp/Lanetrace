@@ -7,6 +7,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+- The reconnect banner and the Load plan from this folder bar center their message and buttons, so they no longer sit at opposite edges of a wide screen
+
 ### Fixed
 - Continue with the sample, while the linked folder still needs permission, offers **Load plan from this folder** when a spreadsheet is beside the HTML. That offer stays hidden while the reconnect gate covers the page
 - A plan loaded before Reconnect is written into the sync folder once permission is granted. Lanetrace no longer says Excel or OneDrive has the file locked when the browser has not allowed writing yet

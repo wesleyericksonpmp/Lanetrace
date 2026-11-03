@@ -447,6 +447,9 @@ body[data-layout="centered"] main { padding-inline:max(32px, calc((100vw - 1600p
   padding:10px 16px; background:color-mix(in srgb, var(--blue) 10%, var(--card));
   border-bottom:1px solid var(--border); font-size:13px }
 .plan-offer .sp-btn, .plan-offer .sandbox-close { flex-shrink:0 }
+/* v4.16.1 follow-up: sync banner and plan offer center their message and buttons on wide screens */
+#sync-banner, #plan-offer { justify-content:center; text-align:center }
+#sync-banner .sandbox-msg, #plan-offer #plan-offer-msg { flex:0 1 auto }
 #sync-banner-folder:empty { display:none }
 #sync-banner-folder { display:block; font-size:12px; margin-top:2px }
 #toast { position:fixed; left:50%; bottom:24px; transform:translateX(-50%) translateY(20px); z-index:220;
@@ -807,7 +810,7 @@ body[data-layout="centered"] main { padding-inline:max(32px, calc((100vw - 1600p
 </div>
 <div id="sync-gate" hidden></div>
 <div id="plan-offer" class="plan-offer" style="display:none" role="status">
-  <span id="plan-offer-msg" style="flex:1"></span>
+  <span id="plan-offer-msg"></span>
   <button type="button" class="sp-btn primary" id="plan-offer-load">Load plan from this folder</button>
   <button type="button" class="sandbox-close" id="plan-offer-dismiss" aria-label="Dismiss">×</button>
 </div>
@@ -6246,12 +6249,12 @@ function renderSyncBanner() {
       sampleBtn.hidden = true;
       gate.hidden = true;
     } else if (SYNC_GATE_OPEN) {
-      msg.textContent = 'Your plan is in this folder — click Reconnect to load it.';
+      msg.textContent = 'Your plan is in this folder. Click Reconnect to load it.';
       folderEl.textContent = `Folder: ${folder}`;
       sampleBtn.hidden = false;
       gate.hidden = false;
     } else {
-      msg.textContent = 'Showing the built-in sample. Your plan is in this folder — click Reconnect to load it.';
+      msg.textContent = 'Showing the built-in sample. Your plan is in this folder. Click Reconnect to load it.';
       folderEl.textContent = `Folder: ${folder}`;
       sampleBtn.hidden = true;
       gate.hidden = true;
