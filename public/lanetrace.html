@@ -133,6 +133,10 @@ svg { display:block; user-select:none }
                       letter-spacing:.04em; text-transform:uppercase; color:var(--muted);
                       white-space:nowrap; user-select:none; cursor:grab }
 .data-grid thead th:active { cursor:grabbing }
+/* v4.16.1 follow-up: drag a header's right edge to resize the column; double-click it to reset */
+.data-grid thead th .col-resize { position:absolute; top:0; right:0; bottom:0; width:7px; cursor:col-resize; z-index:1 }
+.data-grid thead th .col-resize:hover, .data-grid thead th .col-resize.on { background:var(--blue); opacity:.5 }
+.data-grid thead th.col-sized { overflow:hidden; text-overflow:ellipsis }
 .data-grid thead th.drag-over { background:var(--accent); color:var(--card) }
 .data-grid thead th.dragging { opacity:0.5 }
 .data-grid thead th .col-delete { display:inline-flex; align-items:center; justify-content:center;
@@ -447,6 +451,9 @@ body[data-layout="centered"] main { padding-inline:max(32px, calc((100vw - 1600p
   padding:10px 16px; background:color-mix(in srgb, var(--blue) 10%, var(--card));
   border-bottom:1px solid var(--border); font-size:13px }
 .plan-offer .sp-btn, .plan-offer .sandbox-close { flex-shrink:0 }
+/* v4.16.1 follow-up: sync banner and plan offer center their message and buttons on wide screens */
+#sync-banner, #plan-offer { justify-content:center; text-align:center }
+#sync-banner .sandbox-msg, #plan-offer #plan-offer-msg { flex:0 1 auto }
 #sync-banner-folder:empty { display:none }
 #sync-banner-folder { display:block; font-size:12px; margin-top:2px }
 #toast { position:fixed; left:50%; bottom:24px; transform:translateX(-50%) translateY(20px); z-index:220;
@@ -466,6 +473,16 @@ body[data-layout="centered"] main { padding-inline:max(32px, calc((100vw - 1600p
 #choice .imap-preview th { color:var(--muted); font-weight:600 }
 #choice .imap-miss { color:var(--red); margin:6px 0 0 }
 #choice .acts .sp-btn:disabled { opacity:.4; cursor:not-allowed; filter:none }
+/* v4.16.1 follow-up: Show or hide columns, a checklist in Data view column order */
+#choice.col-pick { width:min(420px, calc(100vw - 32px)) }
+#choice .col-pick-list { list-style:none; margin:8px 0 0; padding:0; max-height:min(420px, 55vh); overflow:auto; border:1px solid var(--border); border-radius:3px }
+#choice .col-pick-list li { display:flex; align-items:center; gap:8px; padding:4px 8px; border-bottom:1px solid var(--border) }
+#choice .col-pick-list li:last-child { border-bottom:0 }
+#choice .col-pick-list label { flex:1; display:flex; align-items:center; gap:8px; cursor:pointer }
+#choice .col-pick-list .col-mv { border:1px solid var(--border); background:var(--card); color:var(--text); border-radius:3px; width:26px; height:24px; cursor:pointer; padding:0 }
+#choice .col-pick-list .col-mv:disabled { opacity:.35; cursor:default }
+.context-menu button:disabled { opacity:.4; cursor:default }
+.context-menu button[hidden] { display:none }
 #choice .imap-remember { display:flex; gap:6px; align-items:center; font-size:12px; margin-top:10px; color:var(--muted) }
 /* context menu (right-click on grid row) */
 .context-menu { position:fixed; background:var(--card); border:1px solid var(--border);
@@ -807,7 +824,7 @@ body[data-layout="centered"] main { padding-inline:max(32px, calc((100vw - 1600p
 </div>
 <div id="sync-gate" hidden></div>
 <div id="plan-offer" class="plan-offer" style="display:none" role="status">
-  <span id="plan-offer-msg" style="flex:1"></span>
+  <span id="plan-offer-msg"></span>
   <button type="button" class="sp-btn primary" id="plan-offer-load">Load plan from this folder</button>
   <button type="button" class="sandbox-close" id="plan-offer-dismiss" aria-label="Dismiss">×</button>
 </div>
@@ -1073,7 +1090,7 @@ body[data-layout="centered"] main { padding-inline:max(32px, calc((100vw - 1600p
         <span style="font-family:ui-monospace,Consolas,monospace">program-timeline.state.json</span>
         and your rows as
         <span style="font-family:ui-monospace,Consolas,monospace">program-timeline.data.xlsx</span>.
-        Reopens automatically on the next visit in Edge or Chrome.
+        Opened from a web address, it reopens on the next visit in Edge or Chrome once you choose Allow on every visit. Opened as a file, the browser asks again each session: click Reconnect.
         Putting the HTML and an Excel file in the same folder is not enough: link the folder here, or load the Excel file again each time.
       </div>
     </div>
@@ -1189,6 +1206,7 @@ body[data-layout="centered"] main { padding-inline:max(32px, calc((100vw - 1600p
       </div>
       <button class="sp-btn" id="filter-clear" type="button" style="margin-left:4px">Clear filters</button>
       <button class="sp-btn" id="grid-add-column" type="button" style="margin-left:4px">+ Column</button>
+      <button class="sp-btn" id="grid-show-cols" type="button" style="margin-left:4px">Show or hide columns</button>
       <span class="data-hint">Click row to select. Right-click or use toolbar for row actions. Keyboard: Ctrl+Shift+↑/↓ insert, Del deletes.</span>
       <span class="data-count" id="grid-count">—</span>
     </div>
@@ -1205,6 +1223,14 @@ body[data-layout="centered"] main { padding-inline:max(32px, calc((100vw - 1600p
 <div id="dropzone">Drop the .xlsx to load</div>
 <div id="toast" role="status"></div>
 
+<div id="col-menu" class="context-menu" role="menu">
+  <button data-action="hide">Hide this column</button>
+  <button data-action="left">Move left</button>
+  <button data-action="right">Move right</button>
+  <button data-action="reset-width">Reset width</button>
+  <hr>
+  <button data-action="show-hide">Show or hide columns</button>
+</div>
 <div id="row-context-menu" class="context-menu">
   <button data-action="open">Open item</button>
   <button data-action="duplicate">Duplicate</button>
@@ -2198,7 +2224,10 @@ const SETTINGS_DEFAULTS = {
   timelineTitle:    'Lanetrace',
   timelineSubtitle: '',
   activeView:       'timeline',  // 'timeline' | 'data'
-  dataGroupBy:      ''           // v4.14: Data view grouping, '' | 'swimlane' | 'milestones' (v4.16)
+  dataGroupBy:      '',          // v4.14: Data view grouping, '' | 'swimlane' | 'milestones' (v4.16)
+  dataColOrder:     [],          // v4.16.1 follow-up: Data view column order (field names); empty = default order
+  dataColWidths:    {},          // v4.16.1 follow-up: Data view column widths set by dragging a header edge, { field: px }
+  dataHiddenCols:   []           // v4.16.1 follow-up: Data view columns hidden with Hide this column or Show or hide columns
 };
 // v4.4: Theme packs (drop-in CSS variable sets)
 const THEME_PACKS = {
@@ -5333,13 +5362,12 @@ async function handleFile(file, opts = {}) {
     render();
     // cache a copy in the sync folder for auto-reload next session
     let cacheWriteError = null;
-    if (SYNC_DIR && !opts.fromSyncFolder) {
+    if (opts.fromSyncFolder) PENDING_CACHE = null;
+    else if (SYNC_DIR) {
       try {
         // the cache is always .xlsx, so a CSV or a mapped export is stored as the Excel template filled with its rows
         const buf = isCsv || loaded.mapped ? generateXlsxTemplate({ rows: exportTable(rows).rows, extraColumns: [], creator: 'Lanetrace' }) : await file.arrayBuffer();
-        const fh = await SYNC_DIR.getFileHandle(DATA_CACHE_FILE, { create: true });
-        const s = await fh.createWritable();
-        await s.write(buf); await s.close();
+        cacheWriteError = await fsWriteCacheBuf(buf);
       } catch (e) {
         console.warn('Data cache write failed:', e);
         cacheWriteError = e;
@@ -5353,8 +5381,7 @@ async function handleFile(file, opts = {}) {
     }
     // v4.16.1: a locked OneDrive or Excel file used to fail only in the console, then the success toast hid it
     if (cacheWriteError) {
-      const why = cacheWriteError.message || String(cacheWriteError);
-      toast(`Loaded ${rows.length} rows from ${file.name}, but could not write ${DATA_CACHE_FILE}: ${why}. If Excel or OneDrive has the file open, close it and try again.`, 'err', 9000);
+      toast(`Loaded ${rows.length} rows from ${file.name}, but could not write ${DATA_CACHE_FILE}: ${cacheWriteWhy(cacheWriteError)}. ${CACHE_RETRY_HINT}`, 'err', 9000);
     } else if (warnings.length) toast(`Loaded ${rows.length} rows from ${file.name}. ${warnings.join(' ')}`, 'err', 8000);
     else if (loaded.mapped) toast([`Loaded ${rows.length} rows from ${file.name}.`, ...loaded.notes].join(' '), '', 9000,
       { label: 'Change mapping', run: () => handleFile(LAST_IMPORT_FILE, { remap: true }) });
@@ -5950,7 +5977,12 @@ document.getElementById('sp-file-input').addEventListener('change', ev => {
 document.getElementById('sp-reset-data').addEventListener('click', () => {
   DATA_ROWS = DATA.slice();
   LOADED_FILE_NAME = '';
+  PENDING_CACHE = null;
+  // The plan-loaded banner had the gate hidden while SYNC_GATE_OPEN was still true.
+  // Clearing the file must not cover the sample the person just asked for.
+  if (SYNC_STATUS.needsPermission) SYNC_GATE_OPEN = false;
   applySettings(); syncSettingsUi(); render();
+  renderSyncBanner();
   toast('Restored built-in sample');
   offerPlanFromFolder();
 });
@@ -5974,8 +6006,9 @@ const STATE_FILE       = 'program-timeline.state.json';
 const DATA_CACHE_FILE  = 'program-timeline.data.xlsx';
 const FS_SUPPORTED     = 'showDirectoryPicker' in window;
 let SYNC_DIR    = null;    // FileSystemDirectoryHandle
-let SYNC_STATUS = { linked:false, dirName:'', lastSaved:'', needsPermission:false, readOnly:false, restoredData:false };
+let SYNC_STATUS = { linked:false, dirName:'', lastSaved:'', needsPermission:false, readOnly:false, restoredData:false, restoredState:false };
 let PLAN_OFFER = null;     // spreadsheet found in the linked folder or beside this HTML, not loaded yet
+let PENDING_CACHE = null;  // xlsx bytes waiting for write permission on the linked folder
 let SYNC_GATE_OPEN = true; // the sample stays covered until Reconnect or an explicit continue
 let SESSION_TOUCHED = false; // a file was loaded this visit; reconnect must not replace it with the sample path
 
@@ -6129,12 +6162,14 @@ async function fsPickFolder() {
   if (!FS_SUPPORTED) { toast('Not supported in this browser', 'err'); return; }
   try {
     const handle = await window.showDirectoryPicker({ mode: 'readwrite' });
+    PENDING_CACHE = null;
     SYNC_DIR = handle;
-    SYNC_STATUS = { linked:true, dirName:handle.name, lastSaved:'', needsPermission:false, readOnly:false, restoredData:false };
+    SYNC_STATUS = { linked:true, dirName:handle.name, lastSaved:'', needsPermission:false, readOnly:false, restoredData:false, restoredState:false };
     await idbSet('sync-dir', handle);
     // load pre-existing state file if the folder already has one; otherwise seed one
     const restored = await fsRestoreFromDisk() || { hadState: false, hadData: false };
     SYNC_STATUS.restoredData = !!restored.hadData;
+    SYNC_STATUS.restoredState = !!restored.hadState;
     if (!restored.hadState) await fsWriteStateNow();
     applySettings(); syncSettingsUi(); render();
     renderSyncUi();
@@ -6153,7 +6188,8 @@ async function fsFolderExists(handle) {
 }
 async function fsForgetMissing(name) {
   SYNC_DIR = null;
-  SYNC_STATUS = { linked:false, dirName:'', lastSaved:'', needsPermission:false, readOnly:false, restoredData:false };
+  PENDING_CACHE = null;
+  SYNC_STATUS = { linked:false, dirName:'', lastSaved:'', needsPermission:false, readOnly:false, restoredData:false, restoredState:false };
   try { await idbDel('sync-dir'); } catch (_) {}
   renderSyncUi();
   renderSyncBanner();
@@ -6171,6 +6207,7 @@ async function fsRequestPermission() {
       SYNC_STATUS.needsPermission = false;
       SYNC_STATUS.readOnly = false;
       if (!keepSession) {
+        PENDING_CACHE = null;
         const restored = await fsRestoreFromDisk();
         SYNC_STATUS.restoredData = !!(restored && restored.hadData);
         SYNC_STATUS.restoredState = !!(restored && restored.hadState);
@@ -6178,8 +6215,11 @@ async function fsRequestPermission() {
       applySettings(); syncSettingsUi(); render();
       renderSyncUi();
       renderSyncBanner();
-      toast('Sync folder reconnected');
-      if (keepSession) await fsWriteStateNow();
+      const cacheErr = keepSession ? await fsFlushPendingCache() : null;
+      const stateErr = keepSession ? await fsWriteStateNow() : null;
+      if (cacheErr) {
+        toast(`Could not write ${DATA_CACHE_FILE}: ${cacheWriteWhy(cacheErr)}. ${CACHE_RETRY_HINT}`, 'err', 9000);
+      } else if (!stateErr) toast('Sync folder reconnected');
       if (!LOADED_FILE_NAME) offerPlanFromFolder();
     } else {
       toast('Permission denied', 'err');
@@ -6190,7 +6230,8 @@ async function fsRequestPermission() {
 async function fsDisconnect() {
   if (!await askConfirm('Disconnect the sync folder?', 'Your files stay in place. Only the link from this browser is removed.', 'Disconnect')) return;
   SYNC_DIR = null;
-  SYNC_STATUS = { linked:false, dirName:'', lastSaved:'', needsPermission:false, readOnly:false, restoredData:false };
+  PENDING_CACHE = null;
+  SYNC_STATUS = { linked:false, dirName:'', lastSaved:'', needsPermission:false, readOnly:false, restoredData:false, restoredState:false };
   try { await idbDel('sync-dir'); } catch (_) {}
   renderSyncUi();
   renderSyncBanner();
@@ -6224,20 +6265,20 @@ function renderSyncBanner() {
     const msg = document.getElementById('sync-banner-msg');
     const folderEl = document.getElementById('sync-banner-folder');
     bar.style.display = 'flex';
-    if (SYNC_STATUS.restoredData || LOADED_FILE_NAME) {
-      msg.textContent = SYNC_STATUS.restoredData
+    if (LOADED_FILE_NAME) {
+      msg.textContent = (SYNC_STATUS.restoredData && !SESSION_TOUCHED)
         ? `Loaded your plan from ${folder} read-only. Click Reconnect to save changes.`
         : `Your plan is loaded. Click Reconnect to save changes to ${folder}.`;
       folderEl.textContent = '';
       sampleBtn.hidden = true;
       gate.hidden = true;
     } else if (SYNC_GATE_OPEN) {
-      msg.textContent = 'Your plan is in this folder — click Reconnect to load it.';
+      msg.textContent = 'Your plan is in this folder. Click Reconnect to load it.';
       folderEl.textContent = `Folder: ${folder}`;
       sampleBtn.hidden = false;
       gate.hidden = false;
     } else {
-      msg.textContent = 'Showing the built-in sample. Your plan is in this folder — click Reconnect to load it.';
+      msg.textContent = 'Showing the built-in sample. Your plan is in this folder. Click Reconnect to load it.';
       folderEl.textContent = `Folder: ${folder}`;
       sampleBtn.hidden = true;
       gate.hidden = true;
@@ -6358,12 +6399,18 @@ function renderPlanOffer() {
 }
 async function offerPlanFromFolder() {
   if (LOADED_FILE_NAME) { PLAN_OFFER = null; renderPlanOffer(); return; }
-  // The reconnect banner already explains where the plan is. A second offer would compete with it.
-  if (SYNC_STATUS.needsPermission) { PLAN_OFFER = null; renderPlanOffer(); return; }
+  // Hide a competing offer only while the reconnect gate covers the page.
+  // After Continue with the sample, still look: a sibling spreadsheet, or a read
+  // of a folder we can already read, does not need write permission.
   const gate = document.getElementById('sync-gate');
-  if (gate && !gate.hidden) return;
-  try { PLAN_OFFER = await findPlanCandidate(); }
-  catch (e) { console.warn('Plan folder probe failed:', e); PLAN_OFFER = null; }
+  if (gate && !gate.hidden) { PLAN_OFFER = null; renderPlanOffer(); return; }
+  let found = null;
+  try { found = await findPlanCandidate(); }
+  catch (e) { console.warn('Plan folder probe failed:', e); }
+  if (LOADED_FILE_NAME) { PLAN_OFFER = null; renderPlanOffer(); return; }
+  const gateNow = document.getElementById('sync-gate');
+  if (gateNow && !gateNow.hidden) { PLAN_OFFER = null; renderPlanOffer(); return; }
+  PLAN_OFFER = found;
   renderPlanOffer();
 }
 async function loadPlanOffer() {
@@ -6406,6 +6453,34 @@ document.getElementById('plan-offer-dismiss').addEventListener('click', () => {
 });
 window.addEventListener('resize', () => layoutNoticeBars());
 
+// Bytes for program-timeline.data.xlsx. Held, not written, until the folder is writable.
+async function fsWriteCacheBuf(buf) {
+  if (!SYNC_DIR) return null;
+  if (SYNC_STATUS.needsPermission) { PENDING_CACHE = buf; return null; }
+  try {
+    const fh = await SYNC_DIR.getFileHandle(DATA_CACHE_FILE, { create: true });
+    const writable = await fh.createWritable();
+    await writable.write(buf);
+    await writable.close();
+    PENDING_CACHE = null;
+    return null;
+  } catch (e) {
+    console.warn('Data cache write failed:', e);
+    PENDING_CACHE = buf;   // v4.16.1 follow-up: kept, so the next change retries once Excel or OneDrive lets go
+    return e;
+  }
+}
+// v4.16.1 follow-up: plain words for a failed write of program-timeline.data.xlsx, instead of the browser's own text
+function cacheWriteWhy(e) {
+  if (e && (e.name === 'InvalidStateError' || e.name === 'NoModificationAllowedError')) return 'another program has it open';
+  return String((e && e.message) || e).replace(/[.\s]+$/, '');
+}
+const CACHE_RETRY_HINT = 'Close it in Excel or OneDrive, and Lanetrace tries again after your next change.';
+async function fsFlushPendingCache() {
+  if (!PENDING_CACHE) return null;
+  return fsWriteCacheBuf(PENDING_CACHE);
+}
+
 let fsWriteTimer = 0;
 function fsWriteState() {
   if (!SYNC_DIR || SYNC_STATUS.needsPermission) return;
@@ -6414,6 +6489,7 @@ function fsWriteState() {
 }
 async function fsWriteStateNow() {
   if (!SYNC_DIR) return;
+  if (PENDING_CACHE && !SYNC_STATUS.needsPermission && !await fsFlushPendingCache()) toast(`Saved ${DATA_CACHE_FILE}`);
   try {
     const state = {
       version: 1,
@@ -6435,6 +6511,7 @@ async function fsWriteStateNow() {
   } catch (e) {
     console.warn('fsWriteState failed:', e);
     toast('Sync write failed: ' + e.message, 'err');
+    return e;
   }
 }
 
@@ -7281,21 +7358,21 @@ function gridChoicesFor(col) {
 
 // v4.2: Filter state for data view
 const GRID_FILTERS = { itemType: '', swimlane: '', shown: '' };
-let GRID_ROW_DRAG = false;   // v4.14: a grid row is being dragged, so the page's file drop zone stays out of it
+let GRID_ROW_DRAG = false;   // v4.14: a grid row (or, v4.16.1 follow-up, a column header) is being dragged, so the page's file drop zone stays out of it
 
-// v4.2: Column order state (array of field names; null = use default order)
-let GRID_COLUMN_ORDER = null;
+// v4.2: Column order lives in SETTINGS.dataColOrder (v4.16.1 follow-up), so it saves with the plan
 
 // v4.2: Custom columns (user-defined columns)
 let CUSTOM_COLUMNS = [];  // Array of { field: 'Custom_xyz', label: 'My Column', width: 150, editor: 'text' }
 
 function getOrderedColumns() {
   const allCols = [...GRID_COLUMNS, ...CUSTOM_COLUMNS];
-  if (!GRID_COLUMN_ORDER) return allCols;
+  const order = SETTINGS.dataColOrder;
+  if (!Array.isArray(order) || !order.length) return allCols;
   // Return columns in custom order, falling back to original order for missing fields
   const ordered = [];
   const remaining = new Set(allCols.map(c => c.field));
-  for (const field of GRID_COLUMN_ORDER) {
+  for (const field of order) {
     const col = allCols.find(c => c.field === field);
     if (col) { ordered.push(col); remaining.delete(field); }
   }
@@ -7311,7 +7388,8 @@ const groupedHides = new Set(['Swimlane', 'SubSwimlane']);
 // v4.16: Milestones hides the columns a single date doesn't use, and calls End "Date"
 const milestoneHides = new Set(['StartDate', 'BarStyle']);
 function visibleGridColumns() {
-  const cols = getOrderedColumns();
+  const hidden = new Set(SETTINGS.dataHiddenCols || []);
+  const cols = getOrderedColumns().filter(c => !hidden.has(c.field));
   if (SETTINGS.dataGroupBy === 'milestones')
     return cols.filter(c => !milestoneHides.has(c.field)).map(c => c.field === 'EndDate' ? { ...c, label: 'Date' } : c);
   return SETTINGS.dataGroupBy === 'swimlane' ? cols.filter(c => !groupedHides.has(c.field)) : cols;
@@ -7328,8 +7406,9 @@ function addCustomColumn(label) {
   const col = { field, label, width: 150, editor: 'text', custom: true };
   CUSTOM_COLUMNS.push(col);
   // Add to column order at the end (before the actions column effectively)
-  if (GRID_COLUMN_ORDER) {
-    GRID_COLUMN_ORDER.push(field);
+  if (SETTINGS.dataColOrder?.length) {
+    SETTINGS.dataColOrder.push(field);
+    saveSettings();
   }
   renderDataGrid();
   toast(`Added column "${label}"`);
@@ -7342,9 +7421,11 @@ function removeCustomColumn(field) {
   const col = CUSTOM_COLUMNS[idx];
   CUSTOM_COLUMNS.splice(idx, 1);
   // Remove from column order
-  if (GRID_COLUMN_ORDER) {
-    GRID_COLUMN_ORDER = GRID_COLUMN_ORDER.filter(f => f !== field);
+  if (SETTINGS.dataColOrder?.length) {
+    SETTINGS.dataColOrder = SETTINGS.dataColOrder.filter(f => f !== field);
   }
+  if (SETTINGS.dataColWidths) delete SETTINGS.dataColWidths[field];
+  if (SETTINGS.dataHiddenCols?.length) SETTINGS.dataHiddenCols = SETTINGS.dataHiddenCols.filter(f => f !== field);
   // Remove data from all rows
   const allRows = mergedRows();
   for (const row of allRows) {
@@ -7405,7 +7486,10 @@ function renderDataGrid() {
       const deleteBtn = c.custom
         ? `<button class="col-delete" data-field="${c.field}" title="Remove column" aria-label="Remove column">×</button>`
         : '';
-      return `<th style="min-width:${c.width}px" draggable="true" data-field="${c.field}">${escapeHtml(c.label)}${deleteBtn}</th>`;
+      const w = SETTINGS.dataColWidths?.[c.field];
+      const size = w ? `width:${w}px;min-width:${w}px;max-width:${w}px` : `min-width:${c.width}px`;
+      const grip = `<span class="col-resize" data-field="${c.field}" title="Drag to resize. Double-click to reset." aria-hidden="true"></span>`;
+      return `<th style="${size}" class="${w ? 'col-sized' : ''}" draggable="true" data-field="${c.field}">${escapeHtml(c.label)}${deleteBtn}${grip}</th>`;
     }).join('') +
     '</tr>';
   // v4.12: Quick look column sits right after Title (or first, if Title is not shown)
@@ -8410,10 +8494,49 @@ function initGrid() {
   // v4.2: Column reordering via drag-and-drop
   let draggedCol = null;
   const thead = table.querySelector('thead');
+  // v4.16.1 follow-up: column resize from the header's right edge, saved in SETTINGS.dataColWidths
+  let colResize = null;
+  thead.addEventListener('pointerdown', ev => {
+    const grip = ev.target.closest('.col-resize');
+    if (!grip || ev.button !== 0) return;
+    ev.preventDefault(); ev.stopPropagation();
+    const th = grip.closest('th');
+    colResize = { th, grip, field: grip.dataset.field, x: ev.clientX, w: th.getBoundingClientRect().width };
+    grip.classList.add('on');
+    grip.setPointerCapture(ev.pointerId);
+  });
+  thead.addEventListener('pointermove', ev => {
+    if (!colResize) return;
+    const w = Math.round(clampN(colResize.w + ev.clientX - colResize.x, 48, 900));
+    colResize.th.style.width = colResize.th.style.minWidth = colResize.th.style.maxWidth = w + 'px';
+    colResize.th.classList.add('col-sized');
+    colResize.width = w;
+  });
+  const endColResize = () => {
+    if (!colResize) return;
+    colResize.grip.classList.remove('on');
+    if (colResize.width) {
+      SETTINGS.dataColWidths = { ...(SETTINGS.dataColWidths || {}), [colResize.field]: colResize.width };
+      saveSettings();
+    }
+    colResize = null;
+  };
+  thead.addEventListener('pointerup', endColResize);
+  thead.addEventListener('pointercancel', endColResize);
+  thead.addEventListener('dblclick', ev => {
+    const grip = ev.target.closest('.col-resize');
+    if (!grip || !SETTINGS.dataColWidths?.[grip.dataset.field]) return;
+    const { [grip.dataset.field]: _, ...rest } = SETTINGS.dataColWidths;
+    SETTINGS.dataColWidths = rest;
+    saveSettings();
+    renderDataGrid();
+  });
+
   thead.addEventListener('dragstart', ev => {
     const th = ev.target.closest('th[data-field]');
-    if (!th) return;
+    if (!th || colResize) { if (colResize) ev.preventDefault(); return; }
     draggedCol = th.dataset.field;
+    GRID_ROW_DRAG = true;
     th.classList.add('dragging');
     ev.dataTransfer.effectAllowed = 'move';
     ev.dataTransfer.setData('text/plain', draggedCol);
@@ -8423,6 +8546,7 @@ function initGrid() {
     if (th) th.classList.remove('dragging');
     thead.querySelectorAll('th').forEach(h => h.classList.remove('drag-over'));
     draggedCol = null;
+    GRID_ROW_DRAG = false;
   });
   thead.addEventListener('dragover', ev => {
     ev.preventDefault();
@@ -8439,6 +8563,9 @@ function initGrid() {
   });
   thead.addEventListener('drop', ev => {
     ev.preventDefault();
+    // The re-render below detaches the dragged header, so its dragend never reaches thead.
+    // Clear the guard after this drop finishes, so the page's file drop handler still skips it.
+    setTimeout(() => { GRID_ROW_DRAG = false; });
     const th = ev.target.closest('th[data-field]');
     thead.querySelectorAll('th').forEach(h => h.classList.remove('drag-over'));
     if (!th || !draggedCol || th.dataset.field === draggedCol) return;
@@ -8451,7 +8578,8 @@ function initGrid() {
     const newOrder = cols.map(c => c.field);
     newOrder.splice(fromIdx, 1);
     newOrder.splice(toIdx, 0, draggedCol);
-    GRID_COLUMN_ORDER = newOrder;
+    SETTINGS.dataColOrder = newOrder;
+    saveSettings();
     renderDataGrid();
     toast('Column reordered');
   });
@@ -8468,6 +8596,17 @@ function initGrid() {
     const name = document.getElementById('ask-col-name')?.value.trim();
     if (ok && name) addCustomColumn(name);
   });
+
+  // v4.16.1 follow-up: click a header for its column menu (Hide this column, Move left/right, Reset width)
+  thead.addEventListener('click', ev => {
+    if (ev.target.closest('.col-delete, .col-resize')) return;
+    const th = ev.target.closest('th[data-field]');
+    if (!th) return;
+    ev.stopPropagation();
+    const r = th.getBoundingClientRect();
+    showColumnMenu(th.dataset.field, r.left, r.bottom + 2);
+  });
+  document.getElementById('grid-show-cols').addEventListener('click', () => openShowHideColumns());
 
   // v4.2: Delete custom column (via click on delete button in header)
   thead.addEventListener('click', ev => {
@@ -8510,6 +8649,96 @@ function initGrid() {
     }
   });
 }
+
+// v4.16.1 follow-up: Data view column menu and Show or hide columns
+let COL_MENU_FIELD = null;
+function showColumnMenu(field, x, y) {
+  const menu = document.getElementById('col-menu');
+  const vis = visibleGridColumns().map(c => c.field), i = vis.indexOf(field);
+  menu.querySelector('[data-action="left"]').disabled = i <= 0;
+  menu.querySelector('[data-action="right"]').disabled = i < 0 || i >= vis.length - 1;
+  menu.querySelector('[data-action="reset-width"]').hidden = !SETTINGS.dataColWidths?.[field];
+  COL_MENU_FIELD = field;
+  menu.classList.add('on');
+  const { width: w, height: h } = menu.getBoundingClientRect(), m = 8;
+  menu.style.left = Math.max(m, Math.min(x, window.innerWidth - w - m)) + 'px';
+  menu.style.top = Math.max(m, Math.min(y, window.innerHeight - h - m)) + 'px';
+  setTimeout(() => document.addEventListener('click', hideColumnMenu, { once: true }), 0);
+}
+function hideColumnMenu() {
+  document.getElementById('col-menu').classList.remove('on');
+  COL_MENU_FIELD = null;
+}
+function hideGridColumn(field) {
+  if (visibleGridColumns().length <= 1) { toast('Keep at least one column', 'err'); return; }
+  SETTINGS.dataHiddenCols = [...new Set([...(SETTINGS.dataHiddenCols || []), field])];
+  saveSettings(); renderDataGrid();
+  const col = getOrderedColumns().find(c => c.field === field);
+  toast(`Hid ${col ? col.label : 'the column'}. Show or hide columns brings it back.`);
+}
+// Move a column one place left or right among the columns this view shows
+function moveGridColumn(field, dir) {
+  const vis = visibleGridColumns().map(c => c.field), i = vis.indexOf(field), next = vis[i + dir];
+  if (i < 0 || !next) return;
+  const order = getOrderedColumns().map(c => c.field).filter(f => f !== field);
+  order.splice(order.indexOf(next) + (dir > 0 ? 1 : 0), 0, field);
+  SETTINGS.dataColOrder = order;
+  saveSettings(); renderDataGrid();
+}
+async function openShowHideColumns() {
+  const hidden = new Set(SETTINGS.dataHiddenCols || []);
+  const cols = getOrderedColumns();
+  const item = c => `<li data-field="${c.field}"><label><input type="checkbox"${hidden.has(c.field) ? '' : ' checked'}>${escapeHtml(c.label)}</label>` +
+    `<button type="button" class="col-mv" data-dir="-1" aria-label="Move ${escapeHtml(c.label)} up">↑</button>` +
+    `<button type="button" class="col-mv" data-dir="1" aria-label="Move ${escapeHtml(c.label)} down">↓</button></li>`;
+  const asked = askChoice('Show or hide columns',
+    '<p>Check the columns the Data view shows. Use the arrows to change their order.</p>' +
+    `<ul class="col-pick-list">${cols.map(item).join('')}</ul>`,
+    [{ label: 'Cancel', value: false }, { label: 'Apply', value: true, primary: true }], false);
+  const box = document.getElementById('choice');
+  box.classList.add('col-pick');
+  const list = box.querySelector('.col-pick-list');
+  const syncArrows = () => [...list.children].forEach((li, i, all) => {
+    li.querySelector('[data-dir="-1"]').disabled = i === 0;
+    li.querySelector('[data-dir="1"]').disabled = i === all.length - 1;
+  });
+  syncArrows();
+  list.onclick = ev => {
+    const b = ev.target.closest('.col-mv');
+    if (!b) return;
+    const li = b.closest('li');
+    if (b.dataset.dir === '-1' && li.previousElementSibling) list.insertBefore(li, li.previousElementSibling);
+    else if (b.dataset.dir === '1' && li.nextElementSibling) list.insertBefore(li.nextElementSibling, li);
+    syncArrows();
+    b.focus();
+  };
+  const ok = await asked;
+  box.classList.remove('col-pick');
+  if (!ok) return;
+  const rows = [...list.children];
+  const keep = rows.filter(li => li.querySelector('input').checked);
+  if (!keep.length) { toast('Keep at least one column', 'err'); return; }
+  SETTINGS.dataColOrder = rows.map(li => li.dataset.field);
+  SETTINGS.dataHiddenCols = rows.filter(li => !li.querySelector('input').checked).map(li => li.dataset.field);
+  saveSettings(); renderDataGrid();
+  toast(SETTINGS.dataHiddenCols.length ? `Showing ${keep.length} of ${rows.length} columns` : 'Showing all columns');
+}
+document.getElementById('col-menu').addEventListener('click', ev => {
+  const btn = ev.target.closest('button[data-action]');
+  if (!btn || btn.disabled || !COL_MENU_FIELD) return;
+  const field = COL_MENU_FIELD;
+  hideColumnMenu();
+  const a = btn.dataset.action;
+  if (a === 'hide') hideGridColumn(field);
+  else if (a === 'left') moveGridColumn(field, -1);
+  else if (a === 'right') moveGridColumn(field, 1);
+  else if (a === 'reset-width') {
+    const { [field]: _, ...rest } = SETTINGS.dataColWidths || {};
+    SETTINGS.dataColWidths = rest;
+    saveSettings(); renderDataGrid();
+  }
+  else if (a === 'show-hide') openShowHideColumns();
+});
 
 // v4.3: Context menu state and handlers
 let CONTEXT_MENU = { rowKey: null };

@@ -7,10 +7,27 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+- Hide Data view columns. Click a column header for Hide this column, Move left, Move right and Reset width. Show or hide columns, next to + Column, lists every column with a checkbox and up and down arrows, like SharePoint's Edit view columns. Hidden columns save with your settings
+- Resize Data view columns by dragging the right edge of a header. Double-click the edge to reset that column
+
+### Changed
+- The Data & sync help says what opening as a file means: the browser asks for the folder again each session, so click Reconnect. Opened from a web address, Allow on every visit keeps the folder linked
+- The Data view keeps your column order and widths. They save with your settings and in the sync folder, instead of resetting on reload
+- The reconnect banner and the Load plan from this folder bar center their message and buttons, so they no longer sit at opposite edges of a wide screen
+
+### Fixed
+- When Excel or OneDrive has `program-timeline.data.xlsx` open and Lanetrace cannot save it, Lanetrace keeps the copy and saves it after your next change. It used to drop the copy, so the next restore from the folder could load an older plan
+- The failed-save message says another program has the file open, instead of the browser's own error text
+- Dragging a Data view column header no longer shows "Drop the .xlsx to load" over the page
+- Continue with the sample, while the linked folder still needs permission, offers **Load plan from this folder** when a spreadsheet is beside the HTML. That offer stays hidden while the reconnect gate covers the page. It needs Lanetrace opened from a web address: a page opened as a file can't see the files beside it
+- A plan loaded before Reconnect is written into the sync folder once permission is granted. Lanetrace no longer says Excel or OneDrive has the file locked when the browser has not allowed writing yet
+- Restore sample, while the folder still needs permission, no longer says the saved plan is on screen, and it no longer covers the page with the reconnect gate
+
 ## [4.16.1] - 2026-10-31
 
 ### Added
-- When the linked folder, or the folder next to the HTML, already has `program-timeline.data.xlsx` or a single spreadsheet, Lanetrace offers **Load plan from this folder**
+- When the linked folder, or the folder next to the HTML, already has `program-timeline.data.xlsx` or a single spreadsheet, Lanetrace offers **Load plan from this folder**. The folder next to the HTML counts only when Lanetrace is opened from a web address
 
 ### Fixed
 - Reopening Lanetrace when the browser needs permission for the linked folder no longer leaves the built-in sample looking like your plan. A banner says the plan is in that folder and asks you to reconnect. If the browser still allows a read, the saved plan loads before that reconnect
