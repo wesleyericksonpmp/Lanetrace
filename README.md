@@ -62,6 +62,8 @@ It takes cues from Office Timeline (now Lucen), Microsoft Project, Microsoft Pla
 
 Putting the HTML and your Excel file in the same OneDrive folder is not enough. Link that folder in **Settings → Data & sync**, or load the Excel file again each time you open Lanetrace.
 
+Opened from a web address (a hosted page or `http://localhost`), Chrome and Edge reconnect the linked folder on each visit once you choose **Allow on every visit**, and Lanetrace can offer **Load plan from this folder** for a spreadsheet beside the HTML. Opened as a file (`file:///`), the browser asks again each session, so click **Reconnect**, and it can't see the files beside the HTML.
+
 ## Features
 
 ### Timeline View
@@ -80,7 +82,7 @@ Putting the HTML and your Excel file in the same OneDrive folder is not enough. 
 - List, By swimlane or Milestones layout. By swimlane groups sub-swimlanes too, and a row dragged onto another group moves there. Milestones lists milestones, events and decisions by date
 - New item opens the same item form the timeline uses
 - Quick look column: open the item, preview notes, row menu
-- Column reordering, custom columns and filters by swimlane, item type and visibility
+- Column reordering, resizing and hiding that stay after a reload, custom columns and filters by swimlane, item type and visibility
 - Data checks flag unreadable dates and missing fields
 - Depends on column: list the Row IDs that must finish first. Lanetrace flags items that start before a predecessor finishes, unknown IDs and loops, and the status update names work waiting on late items
 
