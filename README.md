@@ -8,7 +8,9 @@ Lanetrace turns a spreadsheet into a swimlane timeline for a project, program or
 
 **Version 4.17.1.** [Download lanetrace.html](public/lanetrace.html), open it, and the sample plan loads. See the [changelog](CHANGELOG.md) for what's new.
 
-![The Lanetrace timeline for the Customer Portal Launch sample: color-coded swimlanes, phases, tasks and milestones across nine months](assets/screenshots/timeline.png)
+![The Lanetrace timeline for the Community Hospital EHR Go-Live sample: five swimlanes, a holiday change freeze band, phases, tasks and milestones across fourteen months](assets/screenshots/timeline.png)
+
+The sample is a 14-month EHR implementation at a fictional community hospital: governance, workflow validation, build, interfaces, data conversion, two rounds of integrated testing, super-user and end-user training, a go/no-go decision, go-live and stabilization. The phases and their order follow published EHR timeline models from [MEDHOST](https://www.medhost.com/wp-content/uploads/2022/03/EHR-Implementation-Timeline-Model-22.03.02.pdf) and [HealthIT.gov](https://www.healthit.gov/faq/where-can-i-find-step-step-approach-electronic-health-record-implementation).
 
 ## What It Does
 
@@ -25,13 +27,17 @@ Drop in a spreadsheet and get a roadmap you can put in front of executives:
 
 ## Features at a Glance
 
-**Dark mode with dependency arrows.** Turn on arrows to see which items wait on others. Hover an item to highlight its chain.
+**Dark mode and hover details.** Hover an item to see its dates, owner, health and description. Turn on dependency arrows to see which items wait on others.
 
-![The timeline in dark mode with dependency arrows and the tooltip for Integration Testing](assets/screenshots/app-dark.png)
+![The timeline in dark mode with the tooltip for Integrated testing, round 1](assets/screenshots/app-dark.png)
 
-**The Data view, by swimlane.** Edit inline like a spreadsheet. By swimlane groups rows under each swimlane and sub-swimlane, and you can drag a row to another group.
+**The Data view, by swimlane.** Edit inline like a spreadsheet. By swimlane groups rows under each swimlane and sub-swimlane, and you can drag a row to another group. Click a column header to hide or move that column, or drag its edge to resize it.
 
-![The Data view grouped by swimlane, with Product and Engineering groups](assets/screenshots/data-view.png)
+![The Data view grouped by swimlane, with the column menu open on Owner](assets/screenshots/data-view.png)
+
+**Show or hide columns.** Check the columns you want and use the arrows to set their order. The layout stays after a reload.
+
+![The Show or hide columns checklist with Description and Notes unchecked](assets/screenshots/show-hide-columns.png)
 
 **Match the columns.** A file whose headers don't match the template opens this dialog. Pick the column for each field, check the preview, and Lanetrace remembers the choice for files with the same columns. Planner and Smartsheet exports map on their own.
 
@@ -53,7 +59,7 @@ It takes cues from Office Timeline (now Lucen), Microsoft Project, Microsoft Pla
 
 1. Download `public/lanetrace.html`
 2. Open it in any modern browser (Chrome, Edge, Firefox, Safari)
-3. The built-in sample data demonstrates all features
+3. The built-in sample, a hospital EHR go-live, demonstrates every feature
 4. To load your own data:
    - Click **Settings** > **Download template** to get the Excel template (a copy is also in [examples/](examples/))
    - Fill in your data. The template's Instructions sheet explains every column
@@ -72,6 +78,7 @@ Opened from a web address (a hosted page or `http://localhost`), Chrome and Edge
 - Collapsible swimlanes that show one summary bar with dates, item count and % complete
 - Optional milestone strip above the timescale, for all milestones or pinned ones
 - Today marker, or a custom "as of" date
+- Holiday and blackout bands, such as a change freeze, from one line per date range in Settings
 - Dependency arrows, off by default: turn them on in Settings or the command palette. Hover over an item to highlight its chain; conflicts draw red and dashed
 - Timescale rows that fit the date range (weeks for short projects, quarters for multi-year portfolios), grid and legend
 - Bar labels pick white or dark text for contrast, in every theme
@@ -88,7 +95,7 @@ Opened from a web address (a hosted page or `http://localhost`), Chrome and Edge
 
 **The item form.** Title, description, type, owner and swimlane first, then schedule, dependencies, Markdown notes, a running Updates log and appearance options. Each update is saved with its date and time, newest first.
 
-![The item form open on API Development](assets/screenshots/item-form.png)
+![The item form open on Inpatient build, marked At Risk, with one update](assets/screenshots/item-form.png)
 
 ### Imports
 - **Lanetrace template**: the Excel file from Settings, or one Lanetrace exported
@@ -109,11 +116,11 @@ Opened from a web address (a hosted page or `http://localhost`), Chrome and Edge
 
 Pick an audience and a look-ahead window, then copy a prompt for your approved AI assistant and the timeline image for your email.
 
-![The Status update dialog with a steering committee prompt for Customer Portal Launch](assets/screenshots/status-update.png)
+![The Status update dialog with a steering committee prompt for Community Hospital EHR Go-Live](assets/screenshots/status-update.png)
 
 ### Exports
 - **SVG**: Vector format, editable in Illustrator/Figma
-- **PNG and clipboard**: High-resolution image for slides and email
+- **PNG and clipboard**: High-resolution image for slides and email, with the title and legend. Download PNG (16:9 slide) fits the timeline on a 3840 x 2160 slide
 - **PDF**: Via browser print dialog
 - **PowerPoint**: Embedded image on a 16:9 slide
 - **Excel**: Every item with your edits, in the template layout, so it loads back in
