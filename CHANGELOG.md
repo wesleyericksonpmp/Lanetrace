@@ -8,7 +8,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Changed
-- The built-in sample is now a 14-month EHR go-live at a fictional community hospital: 24 items across Program Leadership, Clinical Applications, Revenue Cycle, Technical, and Training and Readiness. Its phases follow published EHR timeline models (MEDHOST, HealthIT.gov), and it includes an At Risk build with an update, dependencies, a go/no-go decision and one hidden phase 2 item. Edits made to the old sample don't carry over to the new rows
+- The built-in sample is now a 14-month EHR go-live at a fictional community hospital: 24 items across Program Leadership, Clinical Applications, Revenue Cycle, Technical, and Training and Readiness. Its phases follow a public Epic go-live plan (San Francisco Department of Public Health) and HealthIT.gov's implementation steps, and it includes an At Risk build with an update, dependencies, a go/no-go decision and one hidden phase 2 item. Edits made to the old sample don't carry over to the new rows
 - README screenshots show the new sample and the 4.17 features: the Data view column menu, Show or hide columns, and a change freeze band
 
 ## [4.17.1] - 2026-11-04

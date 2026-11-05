@@ -10,7 +10,7 @@ Lanetrace turns a spreadsheet into a swimlane timeline for a project, program or
 
 ![The Lanetrace timeline for the Community Hospital EHR Go-Live sample: five swimlanes, a holiday change freeze band, phases, tasks and milestones across fourteen months](assets/screenshots/timeline.png)
 
-The sample is a 14-month EHR implementation at a fictional community hospital: governance, workflow validation, build, interfaces, data conversion, two rounds of integrated testing, super-user and end-user training, a go/no-go decision, go-live and stabilization. The phases and their order follow published EHR timeline models from [MEDHOST](https://www.medhost.com/wp-content/uploads/2022/03/EHR-Implementation-Timeline-Model-22.03.02.pdf) and [HealthIT.gov](https://www.healthit.gov/faq/where-can-i-find-step-step-approach-electronic-health-record-implementation).
+The sample is a 14-month EHR implementation at a fictional community hospital: governance, workflow validation, build, interfaces, data conversion, two rounds of integrated testing, super-user and end-user training, a go/no-go decision, go-live and stabilization. The phases and their order follow the public plan for San Francisco Department of Public Health's [initial Epic go-live](https://sfdph.archive.sf.gov/dph/hc/HCAgen/HCAgen2018/February%206/Health%20Commission%20Feb%202018%20v4_3.pdf) and [HealthIT.gov's implementation steps](https://www.healthit.gov/faq/where-can-i-find-step-step-approach-electronic-health-record-implementation).
 
 ## What It Does
 
