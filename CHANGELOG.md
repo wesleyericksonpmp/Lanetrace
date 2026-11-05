@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [4.17.0] - 2026-11-04
+
 ### Added
 - Hide Data view columns. Click a column header for Hide this column, Move left, Move right and Reset width. Show or hide columns, next to + Column, lists every column with a checkbox and up and down arrows, like SharePoint's Edit view columns. Hidden columns save with your settings
 - Resize Data view columns by dragging the right edge of a header. Double-click the edge to reset that column
