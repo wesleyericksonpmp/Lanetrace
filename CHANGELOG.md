@@ -7,6 +7,22 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [4.17.1] - 2026-11-04
+
+### Added
+- **Download PNG (16:9 slide)** fits the chart, title and legend into a 3840 by 2160 image for a PowerPoint slide. When the chart is so wide that its text gets small, the message says to narrow Timeline width or the date range
+- PNG exports show the timeline title, subtitle and a swimlane legend above the chart. With no title, subtitle or legend, the PNG is the chart alone
+- Holidays and blackouts in Settings > Timeline: one range per line, such as `2026-11-23 to 2026-11-27 Thanksgiving`. Each range shades the timeline and shows its label under the timescale
+- The Today line date also sits next to the export buttons, for a plan exported ahead of a meeting
+
+### Changed
+- Download PNG is capped at 3840 pixels wide, and the message says the size it saved
+
+### Fixed
+- Label Position Right keeps the label on the right near the chart's right edge. The chart and its timescale grow wider to fit it, instead of flipping the label to the left
+- Duration labels set to weeks or months use the next smaller unit for short items, such as "5 days" instead of "0.7 wks"
+- Swimlanes that pick their own color no longer turn red, which read as an error or Off Track. A lane you colored red keeps it
+
 ## [4.17.0] - 2026-11-04
 
 ### Added

@@ -1054,6 +1054,12 @@ body[data-layout="centered"] main { padding-inline:max(32px, calc((100vw - 1600p
       <div class="sp-hint" id="sp-today-hint"></div>
     </div>
 
+    <div class="sp-section">
+      <div class="sp-lbl">Holidays and blackouts</div>
+      <textarea id="sp-blackouts" class="sp-date" rows="3" style="width:100%;font:inherit;font-size:12px;resize:vertical" placeholder="2026-11-23 to 2026-11-27 Thanksgiving&#10;2026-12-21 to 2027-01-01 Holiday freeze" aria-label="Holiday and blackout ranges, one per line"></textarea>
+      <div class="sp-hint">One range per line: a start date, "to", an end date, then an optional label. Each range shades the timeline.</div>
+    </div>
+
       </div>
     </details>
     <details class="sp-group" data-g="lanes">
@@ -1136,9 +1142,15 @@ body[data-layout="centered"] main { padding-inline:max(32px, calc((100vw - 1600p
         <button class="sp-btn" id="sp-export-pdf">Print / PDF</button>
         <button class="sp-btn" id="sp-export-pptx">Export for PPT</button>
         <button class="sp-btn" id="sp-export-png">Download PNG</button>
+        <button class="sp-btn" id="sp-export-png-slide">Download PNG (16:9 slide)</button>
         <button class="sp-btn" id="sp-export-copy">Copy to Clipboard</button>
         <button class="sp-btn" id="sp-status-open">Status update…</button>
       </div>
+      <div class="sp-row" style="gap:8px;margin-top:8px;align-items:center">
+        <label for="sp-export-today" class="sp-hint" style="margin:0">Today line on exports</label>
+        <input type="date" id="sp-export-today" class="sp-date">
+      </div>
+      <div class="sp-hint">PNG exports include the title, subtitle and swimlane legend. The 16:9 slide PNG is 3840 by 2160, sized for a PowerPoint slide.</div>
     </div>
     <div class="sp-section">
       <div class="sp-lbl">Data</div>
@@ -1967,6 +1979,8 @@ function paintIcon(elId, name) {
 // ── config ───────────────────────────────────────────────────────────────
 // Default color palette for swimlanes. Users can override via settings.
 const DEFAULT_PALETTE = ['#0072CE','#0092BC','#743A83','#78BE20','#00417D','#F2A900','#D50032'];   // v4.13: listed purple twice
+// v4.17.1: swimlanes that pick their own color skip red, so a lane never looks like an error or Off Track
+const LANE_AUTO_PALETTE = DEFAULT_PALETTE.filter(c => c !== '#D50032');
 // Seed colors for common swimlane names (override-able via settings)
 const SEED_SWIMLANE_COLORS = {
   'Product':          '#0072CE',
@@ -2180,7 +2194,7 @@ const LAYOUT = {
 };
 
 // ── settings (persisted) ─────────────────────────────────────────────────
-const PREVIEW_VERSION = 'v4.17.0';
+const PREVIEW_VERSION = 'v4.17.1';
 const SETTINGS_DEFAULTS = {
   theme: 'auto',
   themePack: 'corporate-blue',
@@ -2205,6 +2219,7 @@ const SETTINGS_DEFAULTS = {
   showToday: true,
   showElapsed: false,       // v4.13: a bar along the bottom of the timescale from the start to today
   showDeps: false,          // v4.12: dependency arrows, off by default
+  blackouts: '',            // v4.17.1: holiday or blackout ranges, one per line: 2026-11-23 to 2026-11-27 Thanksgiving
   showLegend: true,
   showGrid: true,
   showQuarterEmphasis: true,
@@ -2438,9 +2453,9 @@ function deriveSwimlanes(rows) {
   // step to the next unused one so two swimlanes never share a color until the palette runs out
   const used = new Set(finalOrder.map(n => SETTINGS.swimlaneColors[n] || (!themed && SEED_SWIMLANE_COLORS[n])).filter(Boolean).map(c => c.toUpperCase()));
   const autoColor = name => {
-    const start = DEFAULT_PALETTE.indexOf(paletteColorFor(name));
-    for (let k = 0; k < DEFAULT_PALETTE.length; k++) {
-      const c = DEFAULT_PALETTE[(start + k) % DEFAULT_PALETTE.length];
+    const start = LANE_AUTO_PALETTE.indexOf(paletteColorFor(name));
+    for (let k = 0; k < LANE_AUTO_PALETTE.length; k++) {
+      const c = LANE_AUTO_PALETTE[(start + k) % LANE_AUTO_PALETTE.length];
       if (!used.has(c.toUpperCase())) { used.add(c.toUpperCase()); return c; }
     }
     return paletteColorFor(name);
@@ -2455,7 +2470,9 @@ function paletteColorFor(name) {
   // deterministic pick from DEFAULT_PALETTE — same name always maps to same color
   let h = 5381;
   for (let i = 0; i < name.length; i++) h = ((h << 5) + h + name.charCodeAt(i)) | 0;
-  return DEFAULT_PALETTE[Math.abs(h) % DEFAULT_PALETTE.length];
+  const c = DEFAULT_PALETTE[Math.abs(h) % DEFAULT_PALETTE.length];
+  // a name that hashes to red takes the next color instead; every other name keeps the color it had
+  return LANE_AUTO_PALETTE.includes(c) ? c : LANE_AUTO_PALETTE[0];
 }
 
 // ── helpers ──────────────────────────────────────────────────────────────
@@ -2895,11 +2912,12 @@ function render() {
   const tlW = totalDays * LAYOUT.pxPerDay;
   CUR_TIERS = resolveTiers(range, LAYOUT.pxPerDay);     // v4.13: header height depends on the number of rows
   LAYOUT.headerH = timescaleH() + headerGap();
-  const svgW = LAYOUT.labelCol + tlW + LAYOUT.padX * 2;
+  let svgW = LAYOUT.labelCol + tlW + LAYOUT.padX * 2;
 
   // v4.1 — each band gets at least one row's worth of height so empty bands stay visible
   const x0 = LAYOUT.padX + LAYOUT.labelCol;
   const dateToX = d => x0 + dayDiff(d, range.start) * LAYOUT.pxPerDay;
+  svgW += rightLabelOverflow(rows.filter(r => !inStrip(r)), dateToX, svgW);
   CUR_SVGW = svgW;
   SHOWN_COUNT = rows.length;
   bands.forEach(b => { b.lines = packLines(b, dateToX); });
@@ -2918,9 +2936,10 @@ function render() {
   const parts = [];
   // Background rect for exports (uses card color which resolves to white in light mode)
   parts.push(`<rect x="0" y="0" width="${svgW}" height="${svgH}" fill="var(--card)" class="tl-bg"/>`);
-  parts.push(renderHeader(range, dateToX, tlW, x0, y0));
+  parts.push(renderHeader(range, dateToX, tlW, x0, y0, svgW - LAYOUT.padX - x0));
   parts.push(renderLeftRail(bands, svgW, y0));
   if (SETTINGS.showGrid) parts.push(renderGrid(range, dateToX, y0, svgH - LAYOUT.padY));
+  parts.push(renderBlackouts(range, dateToX, y0, svgH - LAYOUT.padY));
   CUR_SVGW = svgW;
   // rows and strip first so their anchors exist; arrows go underneath them
   const rowsSvg = renderRows(bands, dateToX, y0), stripSvg = renderMilestoneStrip(strip, y0);
@@ -2988,26 +3007,29 @@ function tierSegments(unit, range, isTop) {
 const TIER_ROW_H = 18;
 // Height of the drawn timescale, so the Today badge and the first row line up with its real bottom edge
 function timescaleH() { return SETTINGS.timescaleStyle === 'pill' ? 30 : CUR_TIERS.length * TIER_ROW_H; }
-function renderHeader(range, dateToX, tlW, x0, y0) {
+// v4.17.1: scaleW is the header's drawn width. It is wider than tlW when Right labels widen the chart;
+// the extra part carries the row fills with no dates, so the header ends where the chart does.
+function renderHeader(range, dateToX, tlW, x0, y0, scaleW) {
   const style = SETTINGS.timescaleStyle;
-  if (style === 'pill') return renderHeaderPill(range, dateToX, tlW, x0, y0);
-  if (style === 'rounded') return renderHeaderRounded(range, dateToX, tlW, x0, y0);
-  return renderHeaderClassic(range, dateToX, tlW, x0, y0);
+  scaleW = Math.max(tlW, scaleW || tlW);
+  if (style === 'pill') return renderHeaderPill(range, dateToX, tlW, x0, y0, scaleW);
+  if (style === 'rounded') return renderHeaderRounded(range, dateToX, tlW, x0, y0, scaleW);
+  return renderHeaderClassic(range, dateToX, tlW, x0, y0, scaleW);
 }
-function renderHeaderRounded(range, dateToX, tlW, x0, y0) {
-  const inner = renderHeaderClassic(range, dateToX, tlW, x0, y0);
+function renderHeaderRounded(range, dateToX, tlW, x0, y0, scaleW = tlW) {
+  const inner = renderHeaderClassic(range, dateToX, tlW, x0, y0, scaleW);
   const h = timescaleH(), yb = y0 + h - TIER_ROW_H;
   const ticks = tierSegments(CUR_TIERS[CUR_TIERS.length - 1], range, CUR_TIERS.length === 1).slice(1).map(sg => {
     const x = dateToX(sg.start);
     return `<line x1="${x}" y1="${yb + 2}" x2="${x}" y2="${y0 + h - 2}" stroke="#ffffff" stroke-opacity=".22" />`;
   });
-  return `<defs><clipPath id="tl-scale-clip"><rect x="${x0}" y="${y0}" width="${tlW}" height="${h}" rx="10" /></clipPath></defs>` +
+  return `<defs><clipPath id="tl-scale-clip"><rect x="${x0}" y="${y0}" width="${scaleW}" height="${h}" rx="10" /></clipPath></defs>` +
          `<g clip-path="url(#tl-scale-clip)">${inner}${ticks.join('')}</g>`;
 }
 // Pill: one rounded row of the lowest unit
-function renderHeaderPill(range, dateToX, tlW, x0, y0) {
+function renderHeaderPill(range, dateToX, tlW, x0, y0, scaleW = tlW) {
   const h = 30, parts = [];
-  parts.push(`<rect x="${x0}" y="${y0}" width="${tlW}" height="${h}" rx="${h / 2}" fill="var(--scale-q)" />`);
+  parts.push(`<rect x="${x0}" y="${y0}" width="${scaleW}" height="${h}" rx="${h / 2}" fill="var(--scale-q)" />`);
   const unit = CUR_TIERS[CUR_TIERS.length - 1];
   tierSegments(unit, range, true).forEach((sg, i) => {
     const xa = dateToX(sg.start), xb = dateToX(sg.end) + LAYOUT.pxPerDay;
@@ -3020,7 +3042,7 @@ function renderHeaderPill(range, dateToX, tlW, x0, y0) {
   });
   return parts.join('');
 }
-function renderHeaderClassic(range, dateToX, tlW, x0, y0) {
+function renderHeaderClassic(range, dateToX, tlW, x0, y0, scaleW = tlW) {
   const parts = [], n = CUR_TIERS.length;
   const fills = n === 3 ? ['--scale-year', '--scale-q', '--scale-mo'] : n === 2 ? ['--scale-year', '--scale-mo'] : ['--scale-q'];
   const fonts = n === 3 ? [[12, 700], [10, 600], [9, 500]] : n === 2 ? [[12, 700], [10, 500]] : [[12, 700]];
@@ -3033,7 +3055,9 @@ function renderHeaderClassic(range, dateToX, tlW, x0, y0) {
       if (txt) parts.push(`<text x="${(xa + xb) / 2}" y="${y + TIER_ROW_H / 2 + fs / 2 - 1}" fill="#fff" font-size="${fs}" font-weight="${fw}" text-anchor="middle">${txt}</text>`);
     });
   });
-  parts.push(`<line x1="${x0}" y1="${y0 + timescaleH()}" x2="${x0 + tlW}" y2="${y0 + timescaleH()}" class="tl-sep" />`);
+  if (scaleW > tlW) CUR_TIERS.forEach((unit, row) =>
+    parts.push(`<rect x="${x0 + tlW}" y="${y0 + row * TIER_ROW_H}" width="${scaleW - tlW}" height="${TIER_ROW_H}" fill="var(${fills[row]})" />`));
+  parts.push(`<line x1="${x0}" y1="${y0 + timescaleH()}" x2="${x0 + scaleW}" y2="${y0 + timescaleH()}" class="tl-sep" />`);
   return parts.join('');
 }
 
@@ -3313,6 +3337,27 @@ function packLines(b, dateToX) {
 // v4.10: keep side labels inside the chart. Prefer the requested side, flip to the other side when it
 // would run off the edge, and ellipsize as a last resort.
 let CUR_SVGW = 1e9;
+// v4.17.1: how far labels set to Right run past the chart's right edge. The canvas grows by that much,
+// so they stay on the right instead of flipping left.
+function rightLabelOverflow(rows, dateToX, svgW) {
+  const fs = LAYOUT.fontItem, limitR = svgW - LAYOUT.padX;
+  let need = 0;
+  rows.forEach(r => {
+    if (r.LabelPosition !== 'Right') return;
+    let end;
+    if (r._start && r._end) {
+      const style = resolveBarStyle(r.ItemType, r.BarStyle);
+      const tip = style === 'chevron' ? Math.min(LAYOUT.barH * 0.55, 8) : 0;
+      const x = dateToX(r._start), w = Math.max(6, dateToX(r._end) + LAYOUT.pxPerDay - x - tip);
+      end = x + w + tip + 8 + textW((r.Title || '') + durationSuffix(r), fs, 600);
+    } else if (r._at) {
+      const dateStr = (r._pct >= 100 ? '\u2713 ' : '') + fmtMD(r._at);
+      end = dateToX(r._at) + LAYOUT.iconR + 6 + textW(r.Title || '', fs, 600) + textW(' \u00b7 ' + dateStr, fs, 400);
+    } else return;
+    need = Math.max(need, end - limitR);
+  });
+  return need > 0 ? Math.ceil(need) + 4 : 0;
+}
 function fitSide(full, rightX, leftX, size, weight, suffixW) {
   suffixW = suffixW || 0;
   const limitR = CUR_SVGW - LAYOUT.padX, limitL = LAYOUT.padX + LAYOUT.labelCol;
@@ -3485,7 +3530,10 @@ function durationSuffix(r) {
   const mode = SETTINGS.durationLabel;
   if (!mode || mode === 'off' || r._summary || !(r._start && r._end)) return '';
   const days = dayDiff(r._end, r._start) + 1;
-  const unit = mode !== 'auto' ? mode : days < 14 ? 'days' : days <= 112 ? 'weeks' : 'months';
+  let unit = mode !== 'auto' ? mode : days < 14 ? 'days' : days <= 112 ? 'weeks' : 'months';
+  // v4.17.1: under one month or one week, use the next smaller unit instead of "0.3 wks"
+  if (unit === 'months' && days < 28) unit = 'weeks';
+  if (unit === 'weeks' && days < 7) unit = 'days';
   const raw = unit === 'days' ? days : days / (unit === 'weeks' ? 7 : 30.44);
   const n = raw < 2 && unit !== 'days' ? Math.round(raw * 10) / 10 : Math.round(raw);   // whole units, one decimal below 2
   const word = unit === 'days' ? (n === 1 ? 'day' : 'days') : unit === 'weeks' ? (n === 1 ? 'wk' : 'wks') : 'mo';
@@ -3617,6 +3665,24 @@ function dateLabel(r) {
 
 // v4.13: the Today badge hangs from the bottom edge of the timescale with a notch at the exact date. The line is
 // thin and solid and draws under the items; the badge draws on top. Returns { under, over } so render() can layer them.
+// v4.17.1: holiday or blackout ranges from Settings > Timeline, one per line: "2026-11-23 to 2026-11-27 Thanksgiving"
+function parseBlackouts(text) {
+  return String(text || '').split(/\r?\n/).map(line => {
+    const m = line.trim().match(/^(\S+)\s+(?:to|through|-|\u2013)\s+(\S+)\s*(.*)$/i);
+    const a = m && parseDate(m[1]), b = m && parseDate(m[2]);
+    if (!a || !b) return null;
+    return a <= b ? { start: a, end: b, label: m[3].trim() } : { start: b, end: a, label: m[3].trim() };
+  }).filter(Boolean);
+}
+function renderBlackouts(range, dateToX, yTop, yBottom) {
+  return parseBlackouts(SETTINGS.blackouts).filter(b => b.end >= range.start && b.start <= range.end).map(b => {
+    const s = b.start < range.start ? range.start : b.start, e = b.end > range.end ? range.end : b.end;
+    const x = dateToX(s), w = dateToX(e) + LAYOUT.pxPerDay - x, top = yTop + timescaleH();   // below the timescale, beside the Today badge
+    const label = b.label ? `<text x="${x + w / 2}" y="${top + 11}" text-anchor="middle" font-size="10" font-weight="600" class="tl-muted">${escapeHtml(ellipsize(b.label, Math.max(30, w + 40), 10, 600))}</text>` : '';
+    return `<g class="blackout"><title>${escapeHtml((b.label ? b.label + ': ' : '') + fmtMDY(b.start) + ' to ' + fmtMDY(b.end))}</title>` +
+      `<rect x="${x}" y="${top}" width="${Math.max(2, w)}" height="${yBottom - top}" fill="var(--muted)" fill-opacity=".13"/>${label}</g>`;
+  }).join('');
+}
 function renderTodayMarker(dateToX, yTop, yBottom, xMin, xMax) {
   const t = getToday();
   const x = dateToX(t) + LAYOUT.pxPerDay / 2;     // middle of today
@@ -3813,6 +3879,8 @@ function syncSettingsUi() {
   document.getElementById('sp-subw').value = L.subLaneW;
   document.getElementById('sp-tabw-val').textContent = `${L.laneTabW} px`;
   document.getElementById('sp-subw-val').textContent = `${L.subLaneW} px`;
+  document.getElementById('sp-blackouts').value = SETTINGS.blackouts || '';
+  document.getElementById('sp-export-today').value = SETTINGS.todayMode === 'custom' && SETTINGS.todayCustom ? SETTINGS.todayCustom : isoLocal(localMidnight(new Date()));
   const custom = SETTINGS.todayMode === 'custom';
   document.querySelectorAll('#sp-today-mode button').forEach(b => b.classList.toggle('on', b.dataset.v === (custom ? 'custom' : 'auto')));
   const dateEl = document.getElementById('sp-today-date');
@@ -4021,6 +4089,17 @@ document.querySelectorAll('#sp-today-mode button').forEach(b => b.addEventListen
   if (SETTINGS.todayMode === 'custom' && !SETTINGS.todayCustom) SETTINGS.todayCustom = isoLocal(localMidnight(new Date()));
   saveSettings(); render(); syncSettingsUi();
 }));
+document.getElementById('sp-blackouts').addEventListener('change', ev => {
+  SETTINGS.blackouts = ev.target.value; saveSettings(); render();
+  const bad = ev.target.value.split(/\r?\n/).filter(l => l.trim()).length - parseBlackouts(ev.target.value).length;
+  if (bad) toast(`${bad} line${bad === 1 ? '' : 's'} not read. Use a start date, "to", then an end date.`, 'err');
+});
+// v4.17.1: the Today date sits next to the export buttons too, for a plan exported ahead of a meeting
+document.getElementById('sp-export-today').addEventListener('change', ev => {
+  if (!ev.target.value) return;
+  SETTINGS.todayMode = 'custom'; SETTINGS.todayCustom = ev.target.value;
+  saveSettings(); render(); syncSettingsUi();
+});
 document.getElementById('sp-today-date').addEventListener('change', ev => {
   if (!ev.target.value) return;
   SETTINGS.todayMode = 'custom'; SETTINGS.todayCustom = ev.target.value;
@@ -4481,50 +4560,81 @@ document.getElementById('sp-export-copy').addEventListener('click', async () => 
 });
 
 // Download PNG (works in sandboxed iframes where clipboard is blocked)
-document.getElementById('sp-export-png').addEventListener('click', async () => {
+// v4.17.1: PNG export draws the title, subtitle and swimlane legend above the chart. A plain PNG is capped
+// at 3840 px wide; the slide PNG fits everything into 16:9 (3840 x 2160).
+async function exportPng(slide) {
   try {
     toast('Generating PNG...');
     const svg = document.getElementById('tl');
-    const resolvedSvg = resolveCssVarsInSvg(svg);
-    const svgData = new XMLSerializer().serializeToString(resolvedSvg);
-    const svgBlob = new Blob([svgData], { type: 'image/svg+xml;charset=utf-8' });
-    const url = URL.createObjectURL(svgBlob);
-
+    const svgData = new XMLSerializer().serializeToString(resolveCssVarsInSvg(svg));
+    const url = URL.createObjectURL(new Blob([svgData], { type: 'image/svg+xml;charset=utf-8' }));
     const img = new Image();
-    await new Promise((resolve, reject) => {
-      img.onload = resolve;
-      img.onerror = reject;
-      img.src = url;
-    });
-    const scale = 2;
-    const canvas = document.createElement('canvas');
-    canvas.width = img.width * scale;
-    canvas.height = img.height * scale;
-    const ctx = canvas.getContext('2d');
-    ctx.scale(scale, scale);
-    // Always use white background for exports (regardless of current theme)
-    ctx.fillStyle = '#ffffff';
-    ctx.fillRect(0, 0, img.width, img.height);
-    ctx.drawImage(img, 0, 0);
+    await new Promise((resolve, reject) => { img.onload = resolve; img.onerror = reject; img.src = url; });
     URL.revokeObjectURL(url);
 
-    // Trigger download
+    const font = getComputedStyle(document.body).fontFamily;
+    const title = (SETTINGS.timelineTitle || '').trim();   // blank title: no heading
+    const sub = (SETTINGS.timelineSubtitle || '').trim();
+    const lanes = SETTINGS.showLegend ? SWIMLANES.filter(l => !l.hidden && l.name) : [];
+    const titleH = title ? 30 : 0, subH = sub ? 22 : 0, legendH = lanes.length ? 26 : 0;
+    const pad = titleH || subH || legendH ? 24 : 0;
+    const headH = pad ? pad + titleH + subH + (legendH ? legendH + 6 : 0) + 8 : 0;
+    const W = img.width, H = headH + img.height;
+
+    const drawPage = (ctx) => {
+      ctx.fillStyle = '#ffffff'; ctx.fillRect(0, 0, W, H);
+      let y = pad;
+      ctx.textBaseline = 'top'; ctx.fillStyle = '#1a1f2b';
+      if (title) { ctx.font = `700 22px ${font}`; ctx.fillText(title, pad, y); y += titleH; }
+      if (sub) { ctx.fillStyle = '#6b7280'; ctx.font = `400 14px ${font}`; ctx.fillText(sub, pad, y); y += subH; }
+      if (legendH) {
+        let x = pad; y += 6; ctx.font = `600 12px ${font}`;
+        lanes.forEach(l => {
+          ctx.fillStyle = l.hex; ctx.fillRect(x, y + 3, 12, 12);
+          ctx.fillStyle = '#1a1f2b'; ctx.fillText(l.name, x + 18, y + 3);
+          x += 18 + ctx.measureText(l.name).width + 20;
+        });
+      }
+      ctx.drawImage(img, 0, headH);
+    };
+
+    const canvas = document.createElement('canvas');
+    const ctx = canvas.getContext('2d');
+    let note;
+    if (slide) {
+      canvas.width = 3840; canvas.height = 2160;
+      ctx.fillStyle = '#ffffff'; ctx.fillRect(0, 0, canvas.width, canvas.height);
+      const margin = 96, fit = Math.min((canvas.width - margin * 2) / W, (canvas.height - margin * 2) / H);
+      ctx.translate((canvas.width - W * fit) / 2, (canvas.height - H * fit) / 2);
+      ctx.scale(fit, fit);
+      drawPage(ctx);
+      note = fit < 1.5 ? ' The chart is wide, so its text is small on the slide. Narrow Timeline width or the date range for larger text.' : '';
+    } else {
+      const scale = Math.max(1, Math.min(2, 3840 / W));
+      canvas.width = Math.round(W * scale); canvas.height = Math.round(H * scale);
+      ctx.scale(scale, scale);
+      drawPage(ctx);
+      note = '';
+    }
+
     canvas.toBlob(blob => {
       const a = document.createElement('a');
       a.href = URL.createObjectURL(blob);
-      a.download = 'timeline-' + new Date().toISOString().slice(0,10) + '.png';
+      a.download = 'timeline-' + new Date().toISOString().slice(0,10) + (slide ? '-slide' : '') + '.png';
       document.body.appendChild(a);
       a.click();
       document.body.removeChild(a);
       URL.revokeObjectURL(a.href);
-      toast('PNG downloaded!');
+      toast(`PNG downloaded, ${canvas.width} x ${canvas.height}.${note}`, 'ok', note ? 8000 : 3000);
       closePanel();
     }, 'image/png');
   } catch (e) {
     console.error('PNG export error:', e);
     toast('PNG export failed: ' + e.message, 'err');
   }
-});
+}
+document.getElementById('sp-export-png').addEventListener('click', () => exportPng(false));
+document.getElementById('sp-export-png-slide').addEventListener('click', () => exportPng(true));
 
 // ── v4.6: status update prompt ───────────────────────────────────────────
 // Builds a plain-text prompt (as-of date, computed signals, every item) the user can paste into an
