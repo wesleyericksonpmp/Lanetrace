@@ -6,11 +6,11 @@ One HTML file. Excel in, steering-committee visuals out. No server, no login, no
 
 Lanetrace turns a spreadsheet into a swimlane timeline for a project, program or portfolio. It runs in any modern browser, and your data never leaves it.
 
-**Version 4.17.1.** [Download lanetrace.html](public/lanetrace.html), open it, and the sample plan loads. See the [changelog](CHANGELOG.md) for what's new.
+**Version 4.17.2.** [Download lanetrace.html](public/lanetrace.html), open it, and the sample plan loads. See the [changelog](CHANGELOG.md) for what's new.
 
 ![The Lanetrace timeline for the Community Hospital EHR Go-Live sample: five swimlanes, a holiday change freeze band, phases, tasks and milestones across fourteen months](assets/screenshots/timeline.png)
 
-The sample is a 14-month EHR implementation at a fictional community hospital: governance, workflow validation, build, interfaces, data conversion, two rounds of integrated testing, super-user and end-user training, a go/no-go decision, go-live and stabilization. The phases and their order follow the public plan for San Francisco Department of Public Health's [initial Epic go-live](https://sfdph.archive.sf.gov/dph/hc/HCAgen/HCAgen2018/February%206/Health%20Commission%20Feb%202018%20v4_3.pdf) and [HealthIT.gov's implementation steps](https://www.healthit.gov/faq/where-can-i-find-step-step-approach-electronic-health-record-implementation).
+The sample is a typical EHR rollout for a fictional community hospital, over 14 months: governance, workflow validation, build, interfaces, data conversion, application and integrated testing, super-user and end-user training, a go/no-go decision, go-live and stabilization.
 
 ## What It Does
 
@@ -74,7 +74,7 @@ Opened from a web address (a hosted page or `http://localhost`), Chrome and Edge
 
 ### Timeline View
 - SVG-based rendering
-- Color-coded swimlanes with sub-swimlanes
+- Color-coded swimlanes with sub-swimlanes. Items with no sub-swimlane in a swimlane that has others show under General
 - Collapsible swimlanes that show one summary bar with dates, item count and % complete
 - Optional milestone strip above the timescale, for all milestones or pinned ones
 - Today marker, or a custom "as of" date

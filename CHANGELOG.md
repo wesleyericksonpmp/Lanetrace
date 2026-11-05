@@ -7,8 +7,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [4.17.2] - 2026-11-05
+
+### Added
+- In a swimlane that has sub-swimlanes, items with no sub-swimlane show under a muted **General** label instead of a blank band
+
 ### Changed
-- The built-in sample is now a 14-month EHR go-live at a fictional community hospital: 24 items across Program Leadership, Clinical Applications, Revenue Cycle, Technical, and Training and Readiness. Its phases follow a public Epic go-live plan (San Francisco Department of Public Health) and HealthIT.gov's implementation steps, and it includes an At Risk build with an update, dependencies, a go/no-go decision and one hidden phase 2 item. Edits made to the old sample don't carry over to the new rows
+- The in-app user guide (press ?) is rewritten for the current app: imports, the Data view column menu and Show or hide columns, holiday and blackout bands, the slide PNG and other exports, the sync folder and Reconnect, and current shortcuts. It had listed Start date and Item Type as required; End date is the required date
+- The built-in sample is now a 14-month EHR go-live at a fictional community hospital: 25 items across Program Leadership, Clinical Applications, Revenue Cycle, Technical, and Training and Readiness. It follows the phases of a typical EHR rollout and includes an At Risk build with an update, dependencies, a go/no-go decision and one hidden phase 2 item. Edits made to the old sample don't carry over to the new rows
+- The Timeline section of Settings mentions blackouts in its summary line
 - README screenshots show the new sample and the 4.17 features: the Data view column menu, Show or hide columns, and a change freeze band
 
 ## [4.17.1] - 2026-11-04

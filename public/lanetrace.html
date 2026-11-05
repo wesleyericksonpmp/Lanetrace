@@ -707,6 +707,13 @@ body[data-layout="centered"] main { padding-inline:max(32px, calc((100vw - 1600p
 #help-modal table { width:100%; border-collapse:collapse; font-size:13px }
 #help-modal td { padding:6px 8px; border-bottom:1px solid var(--border); vertical-align:top }
 #help-modal td:first-child { font-family:ui-monospace,Consolas,monospace; color:var(--blue); white-space:nowrap; width:1% }
+#help-modal details { margin-bottom:10px }
+#help-modal summary { font-weight:600; cursor:pointer; padding:6px 0 }
+#help-modal .hb { padding:6px 0 8px 16px; color:var(--muted); font-size:12px }
+#help-modal .hb p { margin:0 0 6px }
+#help-modal .hb ul { margin:0 0 6px; padding-left:16px }
+#help-modal .hb li { margin-bottom:3px }
+#help-modal .hb table { font-size:12px; margin-bottom:6px }
 #help-modal .foot { padding:12px 20px; border-top:1px solid var(--border); text-align:right }
 
 /* new-lane mini modal — reuses #modal look, own state */
@@ -962,7 +969,7 @@ body[data-layout="centered"] main { padding-inline:max(32px, calc((100vw - 1600p
       </div>
     </details>
     <details class="sp-group" data-g="timeline">
-      <summary><span class="sp-gt">Timeline</span><span class="sp-gs">Scale, milestones, labels, today</span></summary>
+      <summary><span class="sp-gt">Timeline</span><span class="sp-gs">Scale, milestones, labels, today, blackouts</span></summary>
       <div class="sp-gb">
     <div class="sp-section">
       <div class="sp-lbl">Timescale</div>
@@ -1103,7 +1110,7 @@ body[data-layout="centered"] main { padding-inline:max(32px, calc((100vw - 1600p
 
     <div class="sp-section">
       <div class="sp-lbl">Data source</div>
-      <div id="sp-source" style="font-size:12px;color:var(--muted)">Built-in sample (24 rows)</div>
+      <div id="sp-source" style="font-size:12px;color:var(--muted)">Built-in sample (25 rows)</div>
       <div class="sp-row" style="gap:6px;flex-wrap:wrap">
         <button class="sp-btn primary" id="sp-load-xlsx">Load file…</button>
         <button class="sp-btn" id="sp-download-template">Download template</button>
@@ -1444,79 +1451,117 @@ body[data-layout="centered"] main { padding-inline:max(32px, calc((100vw - 1600p
 <div id="help-modal" role="dialog" aria-labelledby="help-title">
   <div class="card" style="max-width:700px;max-height:85vh;overflow:auto">
     <h2 id="help-title">Lanetrace User Guide</h2>
-    <div class="body" style="font-size:13px">
-      <details open style="margin-bottom:12px">
-        <summary style="font-weight:600;cursor:pointer;padding:6px 0">Getting Started</summary>
-        <div style="padding:8px 0 8px 16px;color:var(--muted)">
-          <p style="margin:0 0 8px"><strong>Option 1: Import from Excel</strong></p>
-          <ol style="margin:0 0 8px;padding-left:20px">
-            <li>Click "Download template" to get the Excel template</li>
-            <li>Fill in your data on the "TimelineExcel" sheet</li>
-            <li>Drag-drop the file into Lanetrace or click "Load .xlsx"</li>
-          </ol>
-          <p style="margin:0 0 8px"><strong>Option 2: Build from scratch</strong></p>
-          <ol style="margin:0;padding-left:20px">
-            <li>Press <kbd>N</kbd> to add a new item</li>
-            <li>Click any item to edit it</li>
-            <li>Use Settings (gear icon) to configure swimlanes and colors</li>
-          </ol>
-        </div>
-      </details>
-      <details style="margin-bottom:12px">
-        <summary style="font-weight:600;cursor:pointer;padding:6px 0">Item Types</summary>
-        <div style="padding:8px 0 8px 16px;color:var(--muted)">
-          <table style="width:100%;font-size:12px">
-            <tr><td style="padding:4px 8px;border-bottom:1px solid var(--border)"><strong>Task</strong></td><td style="padding:4px 8px;border-bottom:1px solid var(--border)">Rectangular bar with square ends (work items)</td></tr>
-            <tr><td style="padding:4px 8px;border-bottom:1px solid var(--border)"><strong>Phase</strong></td><td style="padding:4px 8px;border-bottom:1px solid var(--border)">Rounded-end bar for project phases</td></tr>
-            <tr><td style="padding:4px 8px;border-bottom:1px solid var(--border)"><strong>Milestone</strong></td><td style="padding:4px 8px;border-bottom:1px solid var(--border)">Diamond marker at a single point in time</td></tr>
-            <tr><td style="padding:4px 8px;border-bottom:1px solid var(--border)"><strong>Event</strong></td><td style="padding:4px 8px;border-bottom:1px solid var(--border)">Triangle flag marker for events/kickoffs</td></tr>
-            <tr><td style="padding:4px 8px"><strong>Decision</strong></td><td style="padding:4px 8px">Star marker for decision points</td></tr>
-          </table>
-        </div>
-      </details>
-      <details style="margin-bottom:12px">
-        <summary style="font-weight:600;cursor:pointer;padding:6px 0">Excel Column Reference</summary>
-        <div style="padding:8px 0 8px 16px;color:var(--muted);font-size:12px">
-          <p style="margin:0 0 4px"><strong>Required:</strong> Row ID, Swimlane, Title, Start date, Item Type</p>
-          <p style="margin:0 0 4px"><strong>Optional:</strong> Sub-swimlane, End date, % Complete, Owner, Notes</p>
-          <p style="margin:0 0 4px"><strong>Styling:</strong> Label Position, Title Color, Milestone Shape, Bar Style, Shown, Color Category</p>
-          <p style="margin:0;font-style:italic">See the Instructions sheet in the template for full details.</p>
-        </div>
-      </details>
-      <details style="margin-bottom:12px">
-        <summary style="font-weight:600;cursor:pointer;padding:6px 0">Keyboard Shortcuts</summary>
-        <div style="padding:8px 0 8px 16px">
-          <table style="width:100%;font-size:12px">
-            <tr><td style="padding:4px 8px;border-bottom:1px solid var(--border);font-family:ui-monospace,monospace;color:var(--blue);width:35%">Ctrl/⌘ + K</td><td style="padding:4px 8px;border-bottom:1px solid var(--border)">Command palette (search items)</td></tr>
-            <tr><td style="padding:4px 8px;border-bottom:1px solid var(--border);font-family:ui-monospace,monospace;color:var(--blue)">/</td><td style="padding:4px 8px;border-bottom:1px solid var(--border)">Filter items by name</td></tr>
-            <tr><td style="padding:4px 8px;border-bottom:1px solid var(--border);font-family:ui-monospace,monospace;color:var(--blue)">N</td><td style="padding:4px 8px;border-bottom:1px solid var(--border)">New item</td></tr>
-            <tr><td style="padding:4px 8px;border-bottom:1px solid var(--border);font-family:ui-monospace,monospace;color:var(--blue)">Ctrl/⌘ + Z</td><td style="padding:4px 8px;border-bottom:1px solid var(--border)">Undo</td></tr>
-            <tr><td style="padding:4px 8px;border-bottom:1px solid var(--border);font-family:ui-monospace,monospace;color:var(--blue)">Ctrl/⌘ + Shift + Z</td><td style="padding:4px 8px;border-bottom:1px solid var(--border)">Redo</td></tr>
-            <tr><td style="padding:4px 8px;border-bottom:1px solid var(--border);font-family:ui-monospace,monospace;color:var(--blue)">Ctrl/⌘ + P</td><td style="padding:4px 8px;border-bottom:1px solid var(--border)">Print</td></tr>
-            <tr><td style="padding:4px 8px;border-bottom:1px solid var(--border);font-family:ui-monospace,monospace;color:var(--blue)">?</td><td style="padding:4px 8px;border-bottom:1px solid var(--border)">Show this guide</td></tr>
-            <tr><td style="padding:4px 8px;font-family:ui-monospace,monospace;color:var(--blue)">Esc</td><td style="padding:4px 8px">Close modal/panel</td></tr>
-          </table>
-        </div>
-      </details>
-      <details style="margin-bottom:12px">
-        <summary style="font-weight:600;cursor:pointer;padding:6px 0">Export Options</summary>
-        <div style="padding:8px 0 8px 16px;color:var(--muted);font-size:12px">
-          <p style="margin:0 0 4px"><strong>SVG:</strong> Vector format, editable in Illustrator/Figma</p>
-          <p style="margin:0 0 4px"><strong>PNG:</strong> High-res image for presentations</p>
-          <p style="margin:0 0 4px"><strong>PDF:</strong> Print-ready document</p>
-          <p style="margin:0"><strong>PowerPoint:</strong> Embedded image on 16:9 slide</p>
+    <div class="body">
+      <details open>
+        <summary>Getting started</summary>
+        <div class="hb">
+          <p>The built-in sample is a hospital EHR go-live. Look around, then replace it with your own plan:</p>
+          <ul>
+            <li><strong>Load a spreadsheet:</strong> drop an Excel or CSV file on the page, or use Settings, Data &amp; sync, Load file. Download template gives you the Lanetrace layout with an Instructions sheet</li>
+            <li><strong>Planner or Smartsheet:</strong> load the Excel export as it is. Buckets or indented rows become swimlanes</li>
+            <li><strong>Any other spreadsheet:</strong> Match the columns opens so you can pick the column for each field. Lanetrace remembers the choice</li>
+            <li><strong>From scratch:</strong> press <kbd>N</kbd> or click New item. Restore sample brings the sample back</li>
+          </ul>
         </div>
       </details>
       <details>
-        <summary style="font-weight:600;cursor:pointer;padding:6px 0">Tips</summary>
-        <div style="padding:8px 0 8px 16px;color:var(--muted);font-size:12px">
-          <ul style="margin:0;padding-left:16px">
-            <li>Swimlanes are auto-created from unique values in your data</li>
-            <li>Click an item, or Tab to it and press Enter, to edit it</li>
-            <li>Use the Data view tab for spreadsheet-style editing</li>
-            <li>Your edits are auto-saved to browser storage</li>
-            <li>Right-click a row in the Data view to insert or delete rows</li>
+        <summary>Item types</summary>
+        <div class="hb">
+          <table>
+            <tr><td>Phase</td><td>Bar with rounded ends, for project phases</td></tr>
+            <tr><td>Task</td><td>Bar with a pointed end, for work items</td></tr>
+            <tr><td>Milestone</td><td>Diamond on a single date</td></tr>
+            <tr><td>Event</td><td>Triangle, for something outside the plan such as a kickoff</td></tr>
+            <tr><td>Decision</td><td>Star, for a choice point such as go/no-go</td></tr>
+          </table>
+          <p>Leave Start date blank and the item becomes a milestone on its End date.</p>
+        </div>
+      </details>
+      <details>
+        <summary>Columns</summary>
+        <div class="hb">
+          <p><strong>Required:</strong> Row ID, Swimlane, Title, End date</p>
+          <p><strong>Optional:</strong> Sub-swimlane, Description, Start date, % Complete, Owner, Depends on, Notes (Markdown), Updates, Item Type, Health</p>
+          <p><strong>Appearance:</strong> Label Position, Milestone Shape, Bar Style, Milestone Row, Shown, Color Category, Title Color</p>
+          <p><strong>Depends on</strong> lists the Row IDs that must finish first. Lanetrace flags items that start too early, unknown IDs and loops, and never moves your dates.</p>
+          <p>The Instructions sheet in the template explains every column.</p>
+        </div>
+      </details>
+      <details>
+        <summary>Swimlanes and sub-swimlanes</summary>
+        <div class="hb">
+          <ul>
+            <li>Swimlanes come from the Swimlane column. Set their order and colors in Settings, Swimlanes</li>
+            <li>Collapse a swimlane to one summary bar with its dates, item count and % complete</li>
+            <li>In a swimlane that has sub-swimlanes, items with no sub-swimlane show under <strong>General</strong></li>
           </ul>
+        </div>
+      </details>
+      <details>
+        <summary>Data view</summary>
+        <div class="hb">
+          <ul>
+            <li>Edit cells like a spreadsheet. List, By swimlane or Milestones changes the layout</li>
+            <li>Click a column header to hide it or move it left or right</li>
+            <li>Drag a header edge to resize a column. Double-click the edge to reset it</li>
+            <li>Drag a header to move the column</li>
+            <li><strong>Show or hide columns</strong> lists every column with a checkbox and arrows to change the order</li>
+            <li>Column order, widths and hidden columns stay after a reload and in the sync folder</li>
+            <li>Right-click a row, or use the toolbar, to insert or delete rows</li>
+          </ul>
+        </div>
+      </details>
+      <details>
+        <summary>Timeline options</summary>
+        <div class="hb">
+          <p>In Settings, Timeline:</p>
+          <ul>
+            <li><strong>Holidays and blackouts:</strong> one range per line, such as <em>12/18/2026 to 1/4/2027 Change freeze</em>, draws a shaded band with its label</li>
+            <li><strong>Today marker:</strong> today, or a custom "as of" date. Export &amp; share has the same date next to the downloads</li>
+            <li><strong>Dependency arrows:</strong> off until you turn them on. Hover an item to highlight its chain</li>
+            <li><strong>Label Position Right</strong> keeps labels right of the bar, and the chart widens to fit them</li>
+          </ul>
+        </div>
+      </details>
+      <details>
+        <summary>Export and share</summary>
+        <div class="hb">
+          <p><strong>Download PNG:</strong> high-resolution image with the title, subtitle and legend, up to 3840 px wide</p>
+          <p><strong>Download PNG (16:9 slide):</strong> fits everything on a 3840 x 2160 image for a PowerPoint slide</p>
+          <p><strong>Copy to Clipboard:</strong> the image, ready to paste in an email or chat</p>
+          <p><strong>Download SVG:</strong> vector format, editable in Illustrator or Figma</p>
+          <p><strong>Print / PDF:</strong> through the browser print dialog</p>
+          <p><strong>Export for PPT:</strong> the timeline on a 16:9 slide</p>
+          <p><strong>Export to Excel or CSV:</strong> every item with your edits. The Excel file loads back in</p>
+          <p><strong>Status update:</strong> builds a prompt for your approved AI assistant from your dates, progress and health</p>
+        </div>
+      </details>
+      <details>
+        <summary>Saving and the sync folder</summary>
+        <div class="hb">
+          <ul>
+            <li>Edits save in this browser automatically</li>
+            <li>In Edge or Chrome, link a folder in Settings, Data &amp; sync to keep the plan in two files: <em>program-timeline.state.json</em> and <em>program-timeline.data.xlsx</em></li>
+            <li>Opened from a web address, the folder reconnects on each visit once you choose Allow on every visit. Opened as a file, the browser asks again each session: click Reconnect</li>
+            <li>If Excel or OneDrive has the data file open, Lanetrace says so and tries again after your next change</li>
+          </ul>
+        </div>
+      </details>
+      <details>
+        <summary>Keyboard shortcuts</summary>
+        <div class="hb">
+          <table>
+            <tr><td>Ctrl/⌘ + K</td><td>Command palette: search items or run a command</td></tr>
+            <tr><td>/</td><td>Filter items by name</td></tr>
+            <tr><td>N</td><td>New item</td></tr>
+            <tr><td>Tab, Enter</td><td>Move to an item and open it</td></tr>
+            <tr><td>Ctrl/⌘ + Z</td><td>Undo</td></tr>
+            <tr><td>Ctrl/⌘ + Shift + Z</td><td>Redo</td></tr>
+            <tr><td>Ctrl + Shift + ↑/↓</td><td>Data view: insert a row above or below</td></tr>
+            <tr><td>Del</td><td>Data view: delete the selected row</td></tr>
+            <tr><td>?</td><td>Show this guide</td></tr>
+            <tr><td>Esc</td><td>Close a dialog or panel</td></tr>
+          </table>
         </div>
       </details>
     </div>
@@ -1809,6 +1854,22 @@ const DATA = [
     "ColorCategory": null
   },
   {
+    "RowID": 25,
+    "Swimlane": "Clinical Applications",
+    "SubSwimlane": "Testing",
+    "Title": "Application testing",
+    "Description": "Each analyst team tests its own build, screen by screen, before the applications are tested together.",
+    "StartDate": "2026-11-16",
+    "EndDate": "2027-01-15",
+    "PercentComplete": 0,
+    "TaskOwner": "Testing Lead",
+    "Notes": "Test scripts for every order set, flowsheet and charge. Defects are fixed before integrated testing starts.",
+    "ItemType": "Task",
+    "LabelPosition": "Auto",
+    "IsShown": true,
+    "ColorCategory": null
+  },
+  {
     "RowID": 13,
     "Swimlane": "Clinical Applications",
     "SubSwimlane": "Testing",
@@ -1818,7 +1879,7 @@ const DATA = [
     "EndDate": "2027-02-19",
     "PercentComplete": 0,
     "TaskOwner": "Testing Lead",
-    "DependsOn": "6, 7, 10",
+    "DependsOn": "6, 7, 10, 25",
     "Notes": "End-to-end patient scenarios: ED arrival to admission, discharge and the final bill.",
     "ItemType": "Task",
     "LabelPosition": "Auto",
@@ -2003,7 +2064,7 @@ const DATA = [
     "ColorCategory": null
   }
 ];
-// Sample program (24 items): a community hospital EHR implementation, phased like published EHR timeline models
+// Sample program (25 items): a community hospital EHR implementation, phased like published EHR timeline models
 
 // {
 //   Old data removed - see migration notes
@@ -2251,7 +2312,7 @@ const LAYOUT = {
 };
 
 // ── settings (persisted) ─────────────────────────────────────────────────
-const PREVIEW_VERSION = 'v4.17.1';
+const PREVIEW_VERSION = 'v4.17.2';
 const SETTINGS_DEFAULTS = {
   theme: 'auto',
   themePack: 'corporate-blue',
@@ -3299,6 +3360,11 @@ function renderLeftRail(bands, svgW, yTop) {
       const fit = fitLabel(b.subSwimlane, subW - 18, b.h - LAYOUT.swPad - 4, Math.max(10, LAYOUT.fontLane - 1), 600);
       parts.push(labelText({ x: tabW + 10, cy: b.y + b.h / 2, lines: fit.lines, size: fit.size, weight: 600,
                              anchor: 'start', cls: 'tl-primary swimlane_text', title: b.subSwimlane }));
+    } else if (!b.collapsed) {
+      // v4.17.2: items with no sub-swimlane, in a lane that has others, get a muted "General" label instead of a blank band
+      const fit = fitLabel('General', subW - 18, b.h - LAYOUT.swPad - 4, Math.max(10, LAYOUT.fontLane - 1), 600);
+      parts.push(labelText({ x: tabW + 10, cy: b.y + b.h / 2, lines: fit.lines, size: fit.size, weight: 600,
+                             anchor: 'start', cls: 'tl-muted swimlane_text', title: 'Items with no sub-swimlane' }));
     }
   });
 
