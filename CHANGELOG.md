@@ -7,6 +7,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [4.17.3] - 2026-11-05
+
+### Fixed
+- Compact rows: a title drawn beside its bar could run into the next bar on the same line. The row packer and the renderer now use the same test for whether a title fits inside a bar. Seen at a 1800 px timeline width in the sample (End-user training) and in a Platform lane.
+- Fit window now fits. It sized the chart to the card's outer width, so it always scrolled sideways a little, and titles set to Right widened the canvas past the window (270 px on a plan with Right labels on every task). Auto had the same Right-label problem. Both now shrink the time axis until those titles fit, and Timeline width means the whole chart's width.
+- Compact rows: items now stack in date order. An item whose title flipped to the left of its bar used to land above earlier items.
+
 ## [4.17.2] - 2026-11-05
 
 ### Added

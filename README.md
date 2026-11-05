@@ -6,7 +6,7 @@ One HTML file. Excel in, steering-committee visuals out. No server, no login, no
 
 Lanetrace turns a spreadsheet into a swimlane timeline for a project, program or portfolio. It runs in any modern browser, and your data never leaves it.
 
-**Version 4.17.2.** [Download lanetrace.html](public/lanetrace.html), open it, and the sample plan loads. See the [changelog](CHANGELOG.md) for what's new.
+**Version 4.17.3.** [Download lanetrace.html](public/lanetrace.html), open it, and the sample plan loads. See the [changelog](CHANGELOG.md) for what's new.
 
 ![The Lanetrace timeline for the Community Hospital EHR Go-Live sample: five swimlanes, a holiday change freeze band, phases, tasks and milestones across fourteen months](assets/screenshots/timeline.png)
 

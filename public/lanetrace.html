@@ -2313,7 +2313,7 @@ const LAYOUT = {
 };
 
 // ── settings (persisted) ─────────────────────────────────────────────────
-const PREVIEW_VERSION = 'v4.17.2';
+const PREVIEW_VERSION = 'v4.17.3';
 const SETTINGS_DEFAULTS = {
   theme: 'auto',
   themePack: 'corporate-blue',
@@ -3018,25 +3018,36 @@ function render() {
   // width tuning — target ~1600px total; scale pxPerDay to fit.
   // v4.13: Auto (1600) now fits the chart area of the window, so the whole range shows without sideways scrolling
   const auto = (Number(SETTINGS.timelineWidth) || 1600) === 1600;
-  const card = document.getElementById('view-timeline');
-  const fitW = card && card.clientWidth ? card.clientWidth - parseFloat(getComputedStyle(card).paddingLeft) - parseFloat(getComputedStyle(card).paddingRight) - 2 : 0;
+  const fitW = timelineFitW();
   const chartW = auto ? (fitW >= 700 ? fitW : 1600) : Number(SETTINGS.timelineWidth);
-  const targetTimelineWidth = chartW - LAYOUT.labelCol - LAYOUT.padX * 2;
   // v4.13: the 2.4 px/day floor keeps month labels readable. Long ranges drop the month row, so they can shrink to fit.
   const set = TIER_PRESETS[SETTINGS.timescaleTiers];
   const noMonths = set ? !set.includes('month') && !set.includes('week') : totalDays > 800;
-  LAYOUT.pxPerDay = auto
-    ? Math.max(noMonths ? 0.6 : 2.4, Math.min(5.5, targetTimelineWidth / totalDays))
-    : Math.max(0.8, Math.min(14, targetTimelineWidth / totalDays));
+  const scaleFor = target => auto
+    ? Math.max(noMonths ? 0.6 : 2.4, Math.min(5.5, target / totalDays))
+    : Math.max(0.8, Math.min(14, target / totalDays));
+  const x0 = LAYOUT.padX + LAYOUT.labelCol;
+  const dateToX = d => x0 + dayDiff(d, range.start) * LAYOUT.pxPerDay;
+  const sideRows = rows.filter(r => !inStrip(r));
+  // v4.17.3: titles set to Right used to widen the canvas past the chosen width, so Auto and Fit window
+  // still scrolled sideways. Shrink the time axis until those titles fit inside the width instead.
+  // Overflow is measured past the axis end, so solve axis + overflow = width (it converges in a pass or two).
+  const baseTimelineWidth = chartW - LAYOUT.labelCol - LAYOUT.padX * 2;
+  let over = 0;
+  for (let pass = 0; pass < 6; pass++) {
+    LAYOUT.pxPerDay = scaleFor(baseTimelineWidth - over);
+    const next = rightLabelOverflow(sideRows, dateToX, x0 + totalDays * LAYOUT.pxPerDay + LAYOUT.padX);
+    if (next <= over) break;
+    over = next;
+  }
+  over = rightLabelOverflow(sideRows, dateToX, x0 + totalDays * LAYOUT.pxPerDay + LAYOUT.padX);
   const tlW = totalDays * LAYOUT.pxPerDay;
   CUR_TIERS = resolveTiers(range, LAYOUT.pxPerDay);     // v4.13: header height depends on the number of rows
   LAYOUT.headerH = timescaleH() + headerGap();
-  let svgW = LAYOUT.labelCol + tlW + LAYOUT.padX * 2;
+  // anything still over (the scale floor was reached) widens the canvas, as before
+  let svgW = LAYOUT.labelCol + tlW + LAYOUT.padX * 2 + over;
 
   // v4.1 — each band gets at least one row's worth of height so empty bands stay visible
-  const x0 = LAYOUT.padX + LAYOUT.labelCol;
-  const dateToX = d => x0 + dayDiff(d, range.start) * LAYOUT.pxPerDay;
-  svgW += rightLabelOverflow(rows.filter(r => !inStrip(r)), dateToX, svgW);
   CUR_SVGW = svgW;
   SHOWN_COUNT = rows.length;
   bands.forEach(b => { b.lines = packLines(b, dateToX); });
@@ -3406,6 +3417,12 @@ function bandGeom(b) {
   return { rows: out, h: top + LAYOUT.swPad };
 }
 
+// v4.17.3: one test for "the title fits inside the bar", shared by the row packer and renderItem.
+// The packer used measured text width while the renderer used this estimate, so a label drawn
+// beside its bar could get no room and run into the next bar on the line.
+function labelFitsInBar(label, w) {
+  return label.length * LAYOUT.fontItem * fontStack().cw < w - 10;
+}
 // v4.10: compact rows. Items that do not overlap in time (label included) share a line.
 // Items with an Above/Below label keep a line to themselves.
 function itemExtent(r, dateToX) {
@@ -3421,7 +3438,7 @@ function itemExtent(r, dateToX) {
     if (pos === 'Left' && x - pad - lw >= LAYOUT.padX + LAYOUT.labelCol) L = x - pad - lw;
     else if (pos === 'Left') R = R + pad + 2 + lw;
     else if (pos === 'Above' || pos === 'Below') { L = Math.min(L, x + w / 2 - lw / 2); R = Math.max(R, x + w / 2 + lw / 2); }
-    else if (pos === 'Right' || (pos === 'Auto' && lw >= w - 10)) {
+    else if (pos === 'Right' || (pos === 'Auto' && !labelFitsInBar((r.Title || '') + durationSuffix(r), w))) {
       if (R + pad + 2 + lw > limitR) L = Math.min(L, x - pad - lw); else R = R + pad + 2 + lw;
     }
     return { L, R, solo: pos === 'Above' || pos === 'Below' };
@@ -3446,7 +3463,9 @@ function packLines(b, dateToX) {
   const compact = SETTINGS.rowPacking === 'compact' || (SETTINGS.rowPacking === 'auto' && SHOWN_COUNT > AUTO_COMPACT_AT);
   if (!compact) return b.rows.map(r => [r]);
   const GAP = 10;
-  const items = b.rows.map(r => ({ r, e: itemExtent(r, dateToX) })).sort((p, q) => p.e.L - q.e.L);
+  // v4.17.3: pack in date order, so a label that flips left no longer moves its item above earlier ones
+  const when = r => (r._start || r._at || 0) - 0;
+  const items = b.rows.map(r => ({ r, e: itemExtent(r, dateToX) })).sort((p, q) => (when(p.r) - when(q.r)) || (p.e.L - q.e.L));
   const lines = [], maxR = [];
   items.forEach(({ r, e }) => {
     let li = -1;
@@ -3702,8 +3721,7 @@ function renderItem(r, cy, dateToX, sw) {
       g.push(`<path d="${barPath(x, barY, pw, barH, progStyle)}" fill="${itemFill}" class="task_shape" />`);
     }
     const label = (r.Title || '') + durationSuffix(r);
-    const charW = LAYOUT.fontItem * fontStack().cw;
-    const fits  = label.length * charW < w - 10;
+    const fits  = labelFitsInBar(label, w);
     const pad   = 6;
     const rightX = x + w + tipPx + pad + 2;
     LABEL_CTX[r._rowKey] = { shape: 'bar', pos, pct: r._pct, bgs: ['card'], fill: itemFill };
@@ -3826,6 +3844,13 @@ function renderTodayMarker(dateToX, yTop, yBottom, xMin, xMax) {
   };
 }
 
+// v4.17.3: width the chart can use inside the timeline card, padding off. Auto and Fit window both use it.
+function timelineFitW() {
+  const card = document.getElementById('view-timeline');
+  if (!card || !card.clientWidth) return 0;
+  const cs = getComputedStyle(card);
+  return card.clientWidth - parseFloat(cs.paddingLeft) - parseFloat(cs.paddingRight) - 2;
+}
 let FIT_TIMER = null;
 window.addEventListener('resize', () => {
   if ((Number(SETTINGS.timelineWidth) || 1600) !== 1600) return;
@@ -4167,8 +4192,8 @@ bindSlider('sp-width',    v => { SETTINGS.timelineWidth = v; });
 bindSlider('sp-tabw',     v => { SETTINGS.laneTabW = v; });
 bindSlider('sp-subw',     v => { SETTINGS.subLaneW = v; });
 document.getElementById('sp-fit-width').addEventListener('click', () => {
-  const w = document.getElementById('view-timeline').clientWidth - 8;
-  SETTINGS.timelineWidth = clampN(Math.round(w), 800, 3200);
+  // v4.17.3: the card's inner width (padding off), the same width Auto fits to
+  SETTINGS.timelineWidth = clampN(Math.floor(timelineFitW()), 800, 3200);
   saveSettings(); applySettings(); render(); syncSettingsUi();
 });
 // v4.9: remember which settings groups are open
