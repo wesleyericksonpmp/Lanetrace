@@ -72,7 +72,9 @@ Lanetrace-only fields that have no column today (row order and hidden state) map
 
 ### 4.2 The `Lanetrace` sheet
 
-A new sheet named `Lanetrace`, set to `state="veryHidden"` in `xl/workbook.xml`. Excel's Unhide menu doesn't list veryHidden sheets, so people can't break it by accident, and Excel desktop, Excel for the web and Excel on Mac all keep it on save. (Excel for the web and Mac need a test pass: see 11.)
+A new sheet named `Lanetrace`, set to `state="veryHidden"` in `xl/workbook.xml`. Excel's Unhide menu doesn't list veryHidden sheets ([xlSheetVeryHidden](https://learn.microsoft.com/office/vba/api/excel.xlsheetvisibility)), so people can't break it by accident. Excel desktop keeps it, and its contents, through open, edit and save (tested, see 14). Excel for the web supports the VeryHidden state in its own scripting API ([Excel.SheetVisibility](https://learn.microsoft.com/javascript/api/excel/excel.sheetvisibility)), which suggests it keeps the sheet too, but that still needs a manual test (11).
+
+Find the sheet by name through `xl/workbook.xml` and its relationships, never by part path: Excel renamed the added part from `sheet_lanetrace.xml` to `sheet4.xml` on its first save, and turned inline strings into shared strings. The existing reader already handles both string forms.
 
 | Cell | Holds |
 |---|---|
@@ -108,7 +110,7 @@ Row ID becomes the row key, as `data-format.md` already promises.
 ### 6.1 Watching the file
 
 - Keep the `FileSystemFileHandle` in IndexedDB, the same way the sync folder handle is kept today.
-- Watch it with `FileSystemObserver` (Chrome and Edge 133 or later). On a `modified` record, re-read the file.
+- Watch it with `FileSystemObserver` (Chrome and Edge 133 or later). Excel doesn't modify the file in place: it saves a new file and swaps it in. The observer reports `disappeared` (sometimes followed by `errored`) and then stops watching. So on `disappeared`, `errored` or `modified`: disconnect, re-read the file through the same handle (the handle follows the path and returns Excel's new version), and observe it again after about 300 ms. Tested across two Excel saves in a row (14).
 - Where `FileSystemObserver` is missing, check `getFile().lastModified` when the tab gains focus and every 5 seconds while it's visible.
 - Ignore change events caused by Lanetrace's own save: compare the file's `lastModified` and size to the values recorded right after writing.
 
@@ -135,6 +137,7 @@ This is a three-way merge keyed by Row ID, not a CRDT. A plan has rules (an end 
 ### 6.3 Writing
 
 - Write with `createWritable()` on the workbook's handle. It writes a temporary file and swaps it in, so a crash mid-save can't leave a half-written workbook.
+- While Excel desktop has the workbook open, Lanetrace can still read it (Edge read Excel's saved version while Excel held it open), but can't write it or swap a new copy in until Excel closes it (tested, see 14). Expect this to be the normal case, not an edge case: people keep the workbook open in Excel.
 - If the write fails because Excel or OneDrive holds the file, keep the bytes (as `PENDING_CACHE` does today), show the waiting state, and retry on the next change, on focus, and every 10 seconds.
 - Before overwriting, compare `lastModified` to the base. If the file changed since the last read, merge first (6.2), then write.
 
@@ -143,6 +146,8 @@ This is a three-way merge keyed by Row ID, not a CRDT. A plan has rules (an end 
 ### 7.1 Patch, don't regenerate
 
 `exportExcel` builds a fresh template workbook with `generateXlsxTemplate`. Saving that over a user's workbook would throw away their formatting, extra sheets, formulas, comments and column widths. The save path must patch instead:
+
+Edit every XML part with `DOMParser` and `XMLSerializer`, never with string replacement. In testing, a string-built `<sheet ... r:id=...>` made a workbook Excel refused to open, because that workbook declared the `r:` namespace on each element instead of on the root. Parsing first keeps namespaces right whatever tool wrote the file.
 
 - Unzip the current file (the existing `unzip`).
 - Replace only `xl/worksheets/sheetN.xml` for `TimelineExcel`, writing cell values into the existing rows and columns and keeping each cell's style index (`s=`).
@@ -155,14 +160,18 @@ This is a three-way merge keyed by Row ID, not a CRDT. A plan has rules (an end 
 
 Formulas in the `TimelineExcel` sheet stay as formulas: if a cell has `<f>`, Lanetrace reads its cached value and doesn't overwrite it. Editing such a field in Lanetrace shows "This cell is a formula in Excel" and blocks the edit.
 
+A formula that depends on a cell Lanetrace changed keeps its old cached value in the file until Excel recalculates. Excel desktop recalculated on open in testing, so Lanetrace's reads may show the old value only until the next Excel save. Lanetrace shouldn't try to calculate formulas itself.
+
 ### 7.3 Fallback save
 
 Without file write access, Save downloads the patched workbook under the same name. The user replaces their file. The result is still one file with everything inside.
 
 ## 8. Permissions and the browser
 
-- File access needs a user gesture, so Open or Drop starts it. Drag and drop uses `DataTransferItem.getAsFileSystemHandle()` to get a writable handle.
-- A file opened from a `file://` page works in Edge and Chrome. Managed work browsers can turn file access off by policy. Lanetrace detects that (`showOpenFilePicker` missing or throwing) and falls back to 7.3.
+- File access needs a user gesture, so Open or Drop starts it. Drag and drop uses `DataTransferItem.getAsFileSystemHandle()`.
+- A picked or dropped file starts with **read** access only (`queryPermission({mode:'readwrite'})` returns `prompt`). The first save must call `requestPermission({mode:'readwrite'})` from a click, which shows Edge's "Allow this site to edit?" prompt. Put that on the first Save click, or on an "Allow saving to this file" button, never on an automatic save.
+- Every API this needs exists in Edge 156 on both `http://localhost` and a `file://` page: `showOpenFilePicker`, `getAsFileSystemHandle`, `createWritable`, `queryPermission` and `FileSystemObserver` (tested, see 14).
+- Managed browsers can block it by policy: [DefaultFileSystemWriteGuardSetting](https://learn.microsoft.com/deployedge/microsoft-edge-policies/defaultfilesystemwriteguardsetting) set to 2 blocks write access for every site, [FileSystemWriteBlockedForUrls](https://learn.microsoft.com/deployedge/microsoft-edge-policies/filesystemwriteblockedforurls) blocks it for listed sites, and the matching read policies (`DefaultFileSystemReadGuardSetting`, `FileSystemReadBlockedForUrls`) block opening. Lanetrace detects a blocked or denied request and falls back to 7.3. Windows Controlled Folder Access can also block writes to protected folders such as Documents ([Microsoft Q&A](https://learn.microsoft.com/answers/a/12307253)); the error message should say so.
 - Inside a sandboxed frame (the case `sandboxBlocked()` already handles, such as a SharePoint or Teams viewer), file access isn't available. Opening works read-only and Save is hidden, as downloads are today.
 - Nothing leaves the computer. There are no new network calls.
 
@@ -197,13 +206,16 @@ Manual, on the dev tenant or a personal machine only:
 9. Excel desktop on Windows: open, edit, save; Lanetrace reloads. Excel keeps the veryHidden sheet.
 10. Excel for the web and Excel on Mac: the veryHidden sheet survives a save.
 11. A workbook in a OneDrive-synced folder: Lanetrace sees OneDrive's updates and waits through OneDrive's lock.
+12. Edge's edit-permission prompt: grant it once, save, then confirm a save made while Excel has the file open waits and lands after Excel closes. This needs a person to click the prompt; automation can't grant it.
 
 ## 12. Risks
 
 | Risk | Mitigation |
 |---|---|
 | Patching XML corrupts a workbook Excel then repairs | Test 2 on a corpus of real-world workbooks; write only well-formed parts; keep a copy of the last good bytes in memory and offer "Undo last save" |
-| Excel for the web drops veryHidden sheets | Test 10; if it does, fall back to a custom XML part (`customXml/item1.xml`), which Excel also keeps |
+| Excel for the web drops veryHidden sheets | Test 10; if it does, fall back to a custom XML part (`customXml/item1.xml`). Excel desktop kept one in testing and added its own `itemProps1.xml` beside it |
+| The file watcher stops after Excel's save swaps the file | Re-observe on `disappeared` or `errored` (6.1), and keep the focus and interval check as a backstop |
+| The edit-permission prompt surprises people | Ask on a click with plain wording; remember the grant per file, as the sync folder does |
 | OneDrive conflicts create "Intake-Approach-PC-NAME.xlsx" copies | Detect a sibling with that pattern when the folder is visible and warn |
 | Work browsers block file access | Fallback save (7.3) still produces one file |
 | A user edits the hidden sheet with a macro | Validate the JSON; on failure, use browser settings and warn |
@@ -214,7 +226,25 @@ Manual, on the dev tenant or a personal machine only:
 2. **4.18.1: live.** `FileSystemObserver`, the three-way merge and the conflict dialog.
 3. **Later, if wanted:** a read-only "presenter" mode that opens the workbook and hides editing, for leaders viewing a plan.
 
-## 14. Open questions
+## 14. What was tested
+
+Run on 2026-11-05 on Windows 11 with Excel desktop 16.0 and Edge 156, using a copy of `examples/Lanetrace-Template.xlsx` with a bold, filled title cell, a formula in Notes, a 48-wide column and an extra `Budget` sheet with its own formula. Scripts drove Excel through COM and Edge through Playwright. Test files were temporary copies; no real plan was touched.
+
+| Question | Result |
+|---|---|
+| Does Excel open a workbook patched at the XML level (two cells rewritten as inline strings, a veryHidden sheet added, a custom XML part added)? | **Yes**, once the XML was built correctly. The first attempt failed because of a namespace prefix (7.1) |
+| Does the patch keep the user's formatting and extra content? | **Yes.** Bold and fill on the patched cell, column width, the formula in Notes (which recalculated against the new title), the `Budget` sheet and its formula all intact. 7 of 11 package parts were untouched byte for byte |
+| Does Excel keep the veryHidden sheet when it saves? | **Yes.** Still `state="veryHidden"`, settings JSON readable, and Excel's own edit saved alongside |
+| Does Excel keep a custom XML part when it saves? | **Yes**, and it adds `itemProps1.xml` for it |
+| Can another program read the workbook while Excel has it open? | **Only with sharing allowed.** A read that allows other writers succeeded; a read that doesn't failed. Edge read it while Excel held it open |
+| Can another program write or replace it while Excel has it open? | **No.** Opening for write and moving a new copy over it both failed until Excel closed the file (tested from PowerShell as a stand-in for the browser's write) |
+| Do the browser APIs exist in Edge 156? | **Yes**, on `http://localhost` and on a `file://` page |
+| Does `FileSystemObserver` see Excel's saves? | **Yes, as `disappeared`**, and then the watch stops. Re-observing after each one caught a second save too |
+| Is a dropped file writable right away? | **No.** It starts with read access; writing needs the edit prompt (8) |
+
+Not tested here: Excel for the web, Excel on Mac, a OneDrive-synced folder, the edit-permission prompt itself (needs a person to click), and a browser write while Excel holds the file. Those are manual tests 10 to 12.
+
+## 15. Open questions
 
 1. Should saving to the user's own workbook be the default, or should Lanetrace ask "Save edits back to this workbook?" the first time? Proposed: ask once per file.
 2. Should the Data view column layout live in the workbook (shared) or the browser (personal)? Proposed: browser, since it's a viewing preference.
